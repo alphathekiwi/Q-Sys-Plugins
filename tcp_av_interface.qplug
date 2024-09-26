@@ -1,0 +1,2047 @@
+PluginInfo={
+    Name='AV Interface', Version='4.6.1', BuildVersion='0.24.05.07', Id='8bdf6969-9368-0TCP-0AV0-OINTERFACE00', Author='Total Concept Projects', Description='AV Control Interface Plugin\nAaron | alphathekiwi@gmail.com'
+}
+function eval(s) return assert(load('return '..s))() end
+function tbl_dump(o)
+    if type(o) == 'table' then
+        local s='{'
+        for k, v in pairs(o) do
+            if type(k) ~= 'number' then
+                k='"' .. k .. '"'
+            end
+            s=s .. '[' .. k .. ']=' .. tbl_dump(v) .. ','
+        end
+        if string.find(s, ',$') then s=string.gsub(s, ',$', '') end
+        return s .. '}'
+    else
+        if type(o) == 'number' then return tostring(o)
+        else return "'"..tostring(o).."'"
+end end end
+function spairs(tbl, order)
+    local keys={}
+    for k in pairs(tbl) do keys[#keys+1]=k end
+    if order then
+        table.sort(keys, function(a,b) return order(tbl, a, b) end)
+    else
+        table.sort(keys)
+    end
+    local i=0
+    return function()
+        i=i + 1
+        if keys[i] then
+            return keys[i], tbl[keys[i]]
+end end end
+function strip_val(pattern, data, delim)
+    s, e=string.find(data, pattern)
+    d=delim or string.find(pattern, '=')
+    if s then return string.sub(data, s + d, e)
+    else return 0 end
+end
+-- STATIC DEFS
+INT_HOME, INT_CLUSTER, INT_SETTINGS, INT_FOX, INT_VW_SRC, INT_PRESET, INT_MACRO, INT_CTRLS=1,2,3,4,5,6,7,8
+-- Optional function used if plugin has multiple pages
+PageNames={
+    'Videowalls', 'Setup', 'Database', 'NAVIGATION', 'HOME', 'CLUSTER', 'CLUSTER28',
+    'CLUSTER30', 'PRESETS', 'MACROS', 'CONTROLS', 'FOXCTRL', 'VWSOURCE', 'SETTINGS'
+}
+function GetPages(props)
+    local pages={}
+    for ix, name in ipairs(PageNames) do
+        if props['Hide UCI layers'].Value == false then
+            table.insert(pages, {name=PageNames[ix]})
+        elseif string.upper(name) ~= name then
+            table.insert(pages, {name=PageNames[ix]})
+        end
+    end
+    if props['Hide UCI layers'].Value == true then
+        table.insert(pages, {name='UCI'})
+    end
+    return pages
+end
+FTA_CLS={' ', 'abc_hd', 'abc_me', 'sbs_hd', 'seven_hd', 'seven_two', 'seven_mate',
+            'nine_hd', 'nine_gem', 'nine_go', 'nine_imparja', 'ten_hd', 'ten_peach', 'ten_bold'}
+            -- LAST CHOICES ARE FOR MODULATOR
+            -- , 'sky1', 'sky2', 'sky3', 'trackside', 'optus', 'optus2', 'keno', 'apple', 'chrome', 'playstation', 'nightlife',
+            -- 'foxbox1', 'foxbox2', 'foxbox3', 'foxbox4', 'foxbox5', 'foxbox6', 'foxbox7', 'foxbox8'}
+MOD_CLS={' ', 'sky1', 'sky2', 'sky3', 'trackside', 'optus', 'optus2', 'keno', 'apple', 'chrome', 'dvd', 'playstation', 'nightlife',
+            'foxbox1', 'foxbox2', 'foxbox3', 'foxbox4', 'foxbox5', 'foxbox6', 'foxbox7', 'foxbox8',
+            'media1', 'media2', 'media3', 'media4', 'advert1', 'advert2', 'advert3', 'advert4'}
+            -- LAST CHOICES ARE FOR FREE TO AIR
+            -- , 'abc_hd', 'abc_me', 'sbs_hd', 'seven_hd', 'seven_two', 'seven_mate',
+            -- 'nine_hd', 'nine_gem', 'nine_go', 'nine_imparja', 'ten_hd', 'ten_peach', 'ten_bold'}
+DEFAULT_CHN={[' ']= '', ['sky1']=603, ['sky2']=602, ['sky3']=607, ['trackside']=608, ['keno']=400, ['apple']=701, ['chrome']=702, ['nightlife']=410,
+            ['optus']=613, ['optus2']=614, ['foxbox1']=501, ['foxbox2']=502, ['foxbox3']=503, ['foxbox4']=504, ['foxbox5']=505, ['foxbox6']=506, ['foxbox7']=507, ['foxbox8']=508,
+            ['media1']=521, ['media2']=522, ['media3']=523, ['media4']=524, ['advert1']=531, ['advert2']=532, ['advert3']=533, ['advert4']=534, 
+            ['abc_hd']=21, ['abc_me']=22, ['sbs_hd']=3, ['seven_hd']=70, ['seven_two']=72, ['seven_mate']=73,
+            ['nine_hd']=90, ['nine_gem']=92, ['nine_go']=99, ['nine_imparja']=9, ['ten_hd']=15, ['ten_peach']=11, ['ten_bold']=12}
+DEFAULT_CLS={[1]='seven_hd', [2]='seven_two', [3]='seven_mate', [5]='nine_hd', [6]='nine_gem', [7]='nine_go', [8]='nine_imparja',
+            [9]='ten_hd', [10]='ten_bold', [11]='ten_peach', [13]='abc_hd', [14]='abc_me', [15]='sbs_hd',
+            [17]='sky1', [18]='sky2', [19]='sky3', [20]='trackside', [21]='optus', [22]='optus2', [23]='nightlife', [24]='keno',
+            [25]='foxbox1', [26]='foxbox2', [27]='foxbox3', [28]='foxbox4', [29]='foxbox5', [30]='foxbox6', [31]='apple', [32]='chrome'}
+FOXTEL_CLS={'foxtel501', 'foxtel502', 'foxtel503', 'foxtel504', 'foxtel505', 'foxtel506', 'foxtel507', 'foxtel508', 'foxtel509', 'foxtel510', 'foxtel521'}
+FOXTELS_MAPS={'501', '502', '503', '504','505', '506', '507', '508','509', '510', '521'}
+QCK_PRESETS={' ', 'Fullscreen', 'Twin Split', 'Triple Split', 'Five Way', 'Quad Split', 'LR Bars', 'Left 5 Split', 'Right 5 Split', 'Left 3 Split', 'Right 3 Split', 'Halves 6 Split', 'Thirds 9 Split', '5 Screens', '6 Screens', '7 Screens', '8 Screens'}
+QCK_REGIONS = {
+    [' ']={},
+    ['Fullscreen']={ {0, 0, 1, 1}},
+    ['Twin Split']={ {0, 0, 0.5, 1},
+        {0.5, 0, 0.5, 1}},
+    ['Triple Split']={ {0, 0, 0.333333334, 1},
+        {0.333333334, 0, 0.333333334, 1},
+        {0.666666667, 0, 0.333333334, 1}},
+    ['Five Way']={ {0.25, 0, 0.5, 1},
+        {0, 0, 0.25, 0.5},
+        {0, 0.5, 0.25, 0.5},
+        {0.75, 0, 0.25, 0.5},
+        {0.75, 0.5, 0.25, 0.5}},
+    ['Quad Split']={ {0, 0, 0.5, 0.5},
+        {0.5, 0, 0.5, 0.5},
+        {0, 0.5, 0.5, 0.5},
+        {0.5, 0.5, 0.5, 0.5}},
+    ['LR Bars']={ {0.25, 0, 0.5, 1},
+        {0, 0, 0.25, 1},
+        {0.75, 0, 0.25, 1}},
+    ['Left 3 Split']={ {0, 0, 0.666666667, 1},
+        {0.666666667, 0, 0.333333334, 0.5},
+        {0.666666667, 0.5, 0.333333334, 0.5}},
+    ['Right 3 Split']={ {0.333333334, 0, 0.666666667, 1},
+        {0, 0, 0.333333334, 0.5},
+        {0, 0.5, 0.333333334, 0.5}},
+    ['Left 5 Split']={ {0, 0, 0.5, 1},
+        {0.5, 0, 0.25, 0.5},
+        {0.75, 0, 0.25, 0.5},
+        {0.5, 0.5, 0.25, 0.5},
+        {0.75, 0.5, 0.25, 0.5}},
+    ['Right 5 Split']={ {0.5, 0, 0.5, 1},
+        {0, 0, 0.25, 0.5},
+        {0.25, 0, 0.25, 0.5},
+        {0, 0.5, 0.25, 0.5},
+        {0.25, 0.5, 0.25, 0.5}},
+    ['Halves 6 Split']={ {0, 0, 0.5, 0.666666667},
+        {0.5, 0, 0.5, 0.666666667},
+        {0, 0.666666667, 0.25, 0.333333334},
+        {0.25, 0.666666667, 0.25, 0.333333334},
+        {0.5, 0.666666667, 0.25, 0.333333334},
+        {0.75, 0.666666667, 0.25, 0.333333334}},
+    ['Thirds 9 Split']={ {0, 0, 0.333333334, 0.666666667},
+        {0.333333334, 0, 0.333333334, 0.666666667},
+        {0.666666667, 0, 0.333333334, 0.666666667},
+        {0, 0.666666667, 0.166666667, 0.333333334},
+        {0.166666667, 0.666666667, 0.166666667, 0.333333334},
+        {0.333333334, 0.666666667, 0.166666667, 0.333333334},
+        {0.5, 0.666666667, 0.166666667, 0.333333334},
+        {0.666666667, 0.666666667, 0.166666667, 0.333333334},
+        {0.833333334, 0.666666667, 0.166666667, 0.333333334}},
+    -- SCREENS NOT PRESETS
+    ['5 Screens']={ -- 6 * 5
+        {0, 0, 0.5, 0.6},
+        {0.5, 0, 0.5, 0.6},
+        {0, 0.6, 0.333333334, 0.4},
+        {0.333333334, 0.6, 0.333333334, 0.4},
+        {0.666666667, 0.6, 0.333333334, 0.4}},
+    ['6 Screens']={ {0, 0, 0.333333334, 0.5},
+        {0.333333334, 0, 0.333333334, 0.5},
+        {0.666666667, 0, 0.333333334, 0.5},
+        {0, 0.5, 0.333333334, 0.5},
+        {0.333333334, 0.5, 0.333333334, 0.5},
+        {0.666666667, 0.5, 0.333333334, 0.5}},
+    ['7 Screens']={ -- 12 * 7
+        {0, 0, 0.333333334, 0.571428571},
+        {0.333333334, 0, 0.333333334, 0.571428571},
+        {0.666666667, 0, 0.333333334, 0.571428571},
+        {0, 0.571428571, 0.25, 0.428571429},
+        {0.25, 0.571428571, 0.25, 0.428571429},
+        {0.5, 0.571428571, 0.25, 0.428571429},
+        {0.75, 0.571428571, 0.25, 0.428571429}},
+    ['8 Screens']={ {0, 0, 0.25, 0.5},
+        {0.25, 0, 0.25, 0.5},
+        {0.5, 0, 0.25, 0.5},
+        {0.75, 0, 0.25, 0.5},
+        {0, 0.5, 0.25, 0.5},
+        {0.25, 0.5, 0.25, 0.5},
+        {0.5, 0.5, 0.25, 0.5},
+        {0.75, 0.5, 0.25, 0.5}}
+}
+RENDER_ID={['28 Divisions (7,4,2)']=28, ['30 Divisions (6,5,3,2)']=30, ['28 Divisions']=28, ['30 Divisions']=30}
+CTRL_MAP={[1]='CH UP', [2]='CH DN', [3]='MENU', [4]='EXIT', [5]='OK', [6]='UP', [7]='DOWN', [8]='RIGHT', [9]='LEFT', [10]='ON', [11]='OFF', [12]='HDMI 1', [13]='HDMI 2', [14]='DTV'}
+CTRL_ID={['CH UP']=1, ['CH DN']=2, ['MENU']=3, ['EXIT']=4, ['OK']=5, ['UP']=6, ['DOWN']=7, ['RIGHT']=8, ['LEFT']=9, ['ON']=10, ['OFF']=11, ['HDMI 1']=12, ['HDMI 2']=13, ['DTV']=14}
+SCREEN_LAYOUTS={'Fullscreen', 'Twin Split', 'Triple Split', 'Quad Split', '5 Screens', '6 Screens', '7 Screens', '8 Screens'}
+SCREEN_SIZES  ={{2048, 1152, 28}, {2048, 576, 28},  {3072, 576, 30}, {2048, 1152, 28},   {3072, 1440, 28}, {1536, 576, 28}, {3072, 1008, 30}, {2048, 576, 28}}
+SCREEN_SIZES[0]={1920, 1080, 28}
+CLR_REGIONS={
+    {255, 194, 194}, {255, 225, 194}, {255, 255, 194}, {225, 255, 194},
+    {194, 255, 194}, {194, 255, 225}, {194, 255, 255}, {194, 225, 255},
+    {194, 194, 255}, {225, 194, 255}, {255, 194, 255}, {255, 194, 225}
+}
+-- Defines the Controls used within the plugin
+function GetControls(props)
+    local ctrls={}
+    local screens=math.max(2, props['Number of STB'].Value + props['Number of TVs'].Value)
+    local screen_limit=props['Limit of Screens'].Value
+    do -- VIDEO WALLS
+        table.insert(ctrls, {Name='Editing Cluster', ControlType='Knob', ControlUnit='Integer', Min=0, Max=16, Count=1})
+        table.insert(ctrls, {Name='Editing Preset', ControlType='Knob', ControlUnit='Integer', Min=0, Max=128, Count=1})
+        table.insert(ctrls, {Name='Select Cluster', ControlType='Text', Count=1})
+        table.insert(ctrls, {Name='Select Preset', ControlType='Text', Count=1})
+        table.insert(ctrls, {Name='Panels Width', ControlType='Knob', ControlUnit='Integer', Min=0, Max=19200, Count=1})
+        table.insert(ctrls, {Name='Panels Height', ControlType='Knob', ControlUnit='Integer', Min=0, Max=10800, Count=1})
+        table.insert(ctrls, {Name='Preset Quick Regions', ControlType='Text', Count=1})
+        table.insert(ctrls, {Name='Panel Divisions', ControlType='Text', Count=1})
+        table.insert(ctrls, {Name='Videowall Source Offset', ControlType='Knob', ControlUnit='Integer', Min=-48, Max=48, Count=1})
+        table.insert(ctrls, {Name='Videowall Layer Offset', ControlType='Knob', ControlUnit='Integer', Min=-255, Max=255, Count=1})
+        table.insert(ctrls, {Name='Region Source', ControlType='Text', Count=12})
+        table.insert(ctrls, {Name='Region Default', ControlType='Text', Count=12})
+        table.insert(ctrls, {Name='Region Width', ControlType='Text', Count=12})
+        table.insert(ctrls, {Name='Region Height', ControlType='Text', Count=12})
+        table.insert(ctrls, {Name='Region X', ControlType='Text', Count=12})
+        table.insert(ctrls, {Name='Region Y', ControlType='Text', Count=12})
+        table.insert(ctrls, {Name='Source Pretty', ControlType='Text', Count=12})
+        table.insert(ctrls, {Name='Preset Pretty', ControlType='Text', Count=1})
+    end
+    do -- SETUP CONTROLS
+        table.insert(ctrls, {Name='UCI Name', ControlType='Text', Count=1, UserPin=true, PinStyle='Input'})
+        table.insert(ctrls, {Name='UCI Page', ControlType='Text', Count=1, UserPin=true, PinStyle='Input'})
+        table.insert(ctrls, {Name='Tune Stb', ControlType='Text'})
+        table.insert(ctrls, {Name='Starting IP', ControlType='Text', Count=1})
+
+        table.insert(ctrls, {Name='Cluster Id', ControlType='Knob', ControlUnit='Integer', Min=0, Max=16, Count=16}) -- props['Number of Clusters'].Value
+        table.insert(ctrls, {Name='Cluster Name', ControlType='Text', Count=16}) -- props['Number of Clusters'].Value
+        table.insert(ctrls, {Name='Number of Presets', ControlType='Knob', ControlUnit='Integer', Min=0, Default=2, Max=8, Count=16}) -- props['Number of Clusters'].Value
+        table.insert(ctrls, {Name='Number of Screens', ControlType='Knob', ControlUnit='Integer', Min=0, Default=2, Max=screen_limit, Count=16}) -- props['Number of Clusters'].Value
+        table.insert(ctrls, {Name='Macro Class', ControlType='Text', Count=32})
+        table.insert(ctrls, {Name='Macro Channel', ControlType='Text', Count=32})
+    end
+    do -- DATABASE CONTROLS
+        local foxtels=props['Number of Foxtel Boxes'].Value
+        table.insert(ctrls, { Name='Current Navigation', ControlType='Knob', ControlUnit='Integer', Min=1, Max=7, Count=1 })
+        table.insert(ctrls, { Name='Current Cluster', ControlType='Knob', ControlUnit='Integer', Min=1, Max=16, Count=1 })
+        table.insert(ctrls, { Name='Current Panel', ControlType='Knob', ControlUnit='Integer', Min=1, Max=screen_limit, Count=1 })
+        table.insert(ctrls, { Name='Current Source', ControlType='Knob', ControlUnit='Integer', Min=1, Max=foxtels, Count=1 })
+        table.insert(ctrls, { Name='Cluster DB', ControlType='Text', Count=16 })
+        table.insert(ctrls, { Name='Active Preset', ControlType='Knob', ControlUnit='Integer', Min=-16, Max=16, Count=16 })
+        table.insert(ctrls, { Name='Active StbChn', ControlType='Knob', ControlUnit='Integer', Min=-9999, Max=9999, Count=math.max(2,screens) })
+        table.insert(ctrls, { Name='Active FoxChn', ControlType='Knob', ControlUnit='Integer', Min=0, Max=9999, Count=math.max(2,foxtels) })
+    end
+    do -- CMD INPUT / OUTPUTS
+        table.insert(ctrls, { Name='Input CMD', ControlType='Text', Count=1, UserPin=true, PinStyle='Input' })
+        table.insert(ctrls, { Name='Videowall CMD', ControlType='Text', Count=1, UserPin=true, PinStyle='Output' })
+        table.insert(ctrls, { Name='Screen CMD', ControlType='Text', Count=screens, UserPin=true, PinStyle='Output' })
+        table.insert(ctrls, { Name='Foxtel CMD', ControlType='Text', Count=2, UserPin=true, PinStyle='Output' })
+    end
+    do -- UCI CONTROLS
+        -- -[ NAVIGATION ]
+        table.insert(ctrls, {Name='FoxChn', ControlType='Button', ButtonType='Toggle', Count=6}) -- [FOX CHANNEL]
+        table.insert(ctrls, {Name='Home', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='Label 1', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='Label 2', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='Base 1', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='Base 2', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='TCP Icon', ControlType='Button', ButtonType='Toggle', Count=1}) -- > Settings
+        table.insert(ctrls, {Name='Foxtel', ControlType='Button', ButtonType='Toggle', Count=6}) -- [FOXTEL]
+        -- -[ HOME ]
+        table.insert(ctrls, {Name='Cluster', ControlType='Button', ButtonType='Toggle', Count=16})
+        -- -[ CLUSTER ]
+        table.insert(ctrls, {Name='Render Panel', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='ON', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='OFF', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='PRSTS', ControlType='Button', ButtonType='Toggle', Count=1})
+        -- -[ CLUSTER28 | CLUSTER30 ]
+        table.insert(ctrls, {Name='ScreenTile', ControlType='Button', ButtonType='Toggle', Count=360})
+        -- -[ PRESETS ]
+        table.insert(ctrls, {Name='Preset', ControlType='Button', ButtonType='Toggle', Count=8})
+        -- -[ MACROS ]
+        table.insert(ctrls, {Name='Fox Macro', ControlType='Button', ButtonType='Toggle', Count=16})
+        table.insert(ctrls, {Name='Stb Macro', ControlType='Button', ButtonType='Toggle', Count=32})
+        table.insert(ctrls, {Name='CH UP', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='CH DN', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='CTRLS', ControlType='Button', ButtonType='Toggle', Count=1}) -- > Controls
+        -- -[ CONTROLS ]
+        for i=0, 9 do
+            table.insert(ctrls, {Name='Number ' .. i, ControlType='Button', ButtonType='Toggle', Count=1})
+        end
+        table.insert(ctrls, {Name='HDMI 1', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='HDMI 2', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='DTV', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='VW SRC', ControlType='Button', ButtonType='Toggle', Count=1})  -- > Videowall Source
+        table.insert(ctrls, {Name='Source', ControlType='Button', ButtonType='Toggle', Count=16})
+        table.insert(ctrls, {Name='ON', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='OFF', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='MCRS', ControlType='Button', ButtonType='Toggle', Count=1}) -- > Macros
+        table.insert(ctrls, {Name='UP', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='DOWN', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='LEFT', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='RIGHT', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='OK', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='MENU', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='EXIT', ControlType='Button', ButtonType='Toggle', Count=1})
+        -- -[ SETTINGS ]
+        table.insert(ctrls, {Name='STTNGS', ControlType='Button', ButtonType='Toggle', Count=1})
+        table.insert(ctrls, {Name='Videowall Label', ControlType='Button', ButtonType='Toggle', Count=6})
+        table.insert(ctrls, {Name='Videowall Brightness', ControlType='Knob', ControlUnit='Integer', Min=0, Max=100, Count=6})
+    end
+    table.insert(ctrls, {Name='VideowallRender', ControlType='Button'})
+    return ctrls
+end
+-- Layout of controls and graphics for the plugin UI to display
+function GetControlLayout(props)
+    local layout={}
+    local graphics={}
+    local CurrentPage=PageNames[props['page_index'].Value]
+    local squish_uci=props['Hide UCI layers'].Value
+    table.insert(graphics, {Type='GroupBox', Fill={20, 20, 70, 50}, StrokeWidth=0, CornerRadius=0, Position={5, 5}, Size={1024, 768}})
+    if CurrentPage == 'Setup' then
+        for i=0, 3 do -- 21 - 1024
+            for j=0, 3 do -- 123 - 653
+                local x=(i * 4) + j + 1
+                layout['Cluster Id ' .. x]={ Position={21 + (j * 252), 21 + (i * 96)}, Background='No Background', Size={40, 40}, FontSize=18, Margin=0, Padding=2, StrokeWidth=2}
+                layout['Cluster Name ' .. x]={ Position={61 + (j * 252), 21 + (i * 96)}, Size={196, 40}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+                layout['Number of Presets ' .. x]={ Position={21 + (j * 252), 61 + (i * 96)}, Size={118, 40}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+                layout['Number of Screens ' .. x]={ Position={139 + (j * 252), 61 + (i * 96)}, Size={118, 40}, Color={110, 240, 170}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+                
+                layout['Macro Class ' .. x]={ Style='ComboBox', Position={21 + (j * 104), 405 + (i * 88)}, Size={88, 40}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+                layout['Macro Channel ' .. x]={ Position={21 + (j * 104), 445 + (i * 88)}, Size={88, 32}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+                local x2=(i * 4) + j + 17
+                layout['Macro Class ' .. x2]={ Style='ComboBox', Position={613 + (j * 104), 405 + (i * 88)}, Size={88, 40}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+                layout['Macro Channel ' .. x2]={ Position={613 + (j * 104), 445 + (i * 88)}, Size={88, 32}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+            end
+        end
+        layout['UCI Name']={Style='Text', Size={160, 40}, Position={437, 437}, FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
+        layout['UCI Page']={Style='Text', Size={160, 40}, Position={437, 525}, FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
+        layout['Tune Stb']={Style='ComboBox', Size={160, 40}, Position={437, 613}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+        layout['Starting IP']={Style='Text', Size={160, 40}, Position={437, 701}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+        table.insert(graphics, {Type='Text', Text='UCI Name', Position={437, 405}, Size={160, 32}, FontSize=14, HTextAlign='Center'})
+        table.insert(graphics, {Type='Text', Text='UCI Page', Position={437, 493}, Size={160, 32}, FontSize=14, HTextAlign='Center'})
+        table.insert(graphics, {Type='Text', Text='Quick action', Position={437, 581}, Size={160, 32}, FontSize=14, HTextAlign='Center'})
+        table.insert(graphics, {Type='Text', Text='Starting IP', Position={437, 669}, Size={160, 32}, FontSize=14, HTextAlign='Center'})
+    elseif CurrentPage == 'Videowalls' then
+        layout['VideowallRender']={Style='Button', Position={576,205}, Size={420, 162}, Margin=0, Padding=0, StrokeWidth=0}
+        table.insert(graphics, {Type='GroupBox', Position={577,206}, Size={418, 160}, StrokeWidth=2, CornerRadius=0, Fill={20, 20, 70, 100} })
+        layout['Editing Cluster']={ Style='Text', Size={30, 30}, Position={21, 41}, FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
+        layout['Select Cluster']={ Style='ComboBox', Size={246, 30}, Position={51, 41}, FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
+        layout['Editing Preset']={ Style='Text', Size={30, 30}, Position={313, 41}, FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
+        layout['Select Preset']={ Style='ComboBox', Size={200, 30}, Position={343, 41}, FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
+        layout['Preset Quick Regions']={ Style='ComboBox', Position={575, 41}, Size={204, 30}, FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
+        layout['Videowall Source Offset']={Style='Text', Position={791, 41}, Size={204, 30}, FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
+        
+        table.insert(graphics, {Type='Text', Position={21, 21}, Size={276, 20}, Text='Cluster', FontSize=18, HTextAlign='Center'})
+        table.insert(graphics, {Type='Text', Position={313, 21}, Size={230, 20}, Text='Preset', FontSize=18, HTextAlign='Center'})
+        table.insert(graphics, {Type='Text', Position={575, 20}, Size={204, 20}, Text='Quick Regions', FontSize=16})
+        table.insert(graphics, {Type='Text', Position={791, 21}, Size={204, 20}, Text='Videowall Source Offset', FontSize=16, HTextAlign='Center'})
+        
+        layout['Panels Width']={ Style='Text', Position={21, 103}, Size={134, 30}, FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
+        layout['Panels Height']={ Style='Text', Position={163, 103}, Size={134, 30}, FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
+        layout['Preset Pretty']={ Style='Text', Position={313, 103}, Size={230, 30}, FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
+        layout['Panel Divisions']={Style='ComboBox', Position={575, 103}, Size={204, 30}, FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
+        layout['Videowall Layer Offset']={Style='Text', Position={791, 103}, Size={204, 30}, FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
+        
+        table.insert(graphics, {Type='Text', Position={21, 83}, Size={134, 20}, Text='Width', FontSize=16})
+        table.insert(graphics, {Type='Text', Position={163, 83}, Size={134, 20}, Text='Height', FontSize=16})
+        table.insert(graphics, {Type='Text', Position={313, 83}, Size={230, 21}, Text='Preset Custom Name', FontSize=16})
+        table.insert(graphics, {Type='Text', Position={575, 83}, Size={204, 20}, Text='Panel Divisions', FontSize=16, HTextAlign='Center'})
+        table.insert(graphics, {Type='Text', Position={791, 83}, Size={204, 20}, Text='Videowall Layer Offset', FontSize=16, HTextAlign='Center'})
+
+        table.insert(graphics, {Type='Text', Text='Custom Names', Position={21, 175}, Size={80, 30}, FontSize=12, HTextAlign='Center'})
+        table.insert(graphics, {Type='Text', Text='Source', Position={125, 175}, Size={84, 30}, FontSize=12, HTextAlign='Center'})
+        table.insert(graphics, {Type='Text', Text='Default', Position={217, 175}, Size={80, 30}, FontSize=12, HTextAlign='Center'})
+        table.insert(graphics, {Type='Text', Text='X', Position={313, 175}, Size={50, 30}, FontSize=12, HTextAlign='Center'})
+        table.insert(graphics, {Type='Text', Text='Y', Position={371, 175}, Size={50, 30}, FontSize=12, HTextAlign='Center'})
+        table.insert(graphics, {Type='Text', Text='Width', Position={435, 175}, Size={50, 30}, FontSize=12, HTextAlign='Center'})
+        table.insert(graphics, {Type='Text', Text='Height', Position={493, 175}, Size={50, 30}, FontSize=12, HTextAlign='Center'})
+        local region_limit = props['Limit of Regions'].Value
+        for i=1, region_limit do
+            layout['Source Pretty ' .. i]=  { Size={80, 30}, Position={21, 159 + (i * 46)}, FontSize=14, Margin=0, Padding=2, StrokeWidth=0}
+            table.insert(graphics,          { Size={24, 30}, Position={101, 159 + (i * 46)}, FontSize=16, Type='Text', Text=''..i })
+            layout['Region Source ' .. i]=  { Size={84, 30}, Position={125, 159 + (i * 46)}, Color=CLR_REGIONS[i], FontSize=16, Margin=0, Padding=2, StrokeWidth=0, Style='ComboBox' }
+            layout['Region Default ' .. i]= { Size={80, 30}, Position={217, 159 + (i * 46)}, Color=CLR_REGIONS[i], FontSize=14, Margin=0, Padding=2, StrokeWidth=0}
+            layout['Region X ' .. i]=       { Size={50, 30}, Position={313, 159 + (i * 46)}, Color=CLR_REGIONS[i], FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
+            layout['Region Y ' .. i]=       { Size={50, 30}, Position={371, 159 + (i * 46)}, Color=CLR_REGIONS[i], FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
+            layout['Region Width ' .. i]=   { Size={50, 30}, Position={435, 159 + (i * 46)}, Color=CLR_REGIONS[i], FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
+            layout['Region Height ' .. i]=  { Size={50, 30}, Position={493, 159 + (i * 46)}, Color=CLR_REGIONS[i], FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
+        end
+        table.insert(graphics, {
+            Type='Text', Text='Common pixel pitches we use are:\n384 x 216  <or>  512 x 288\nMultiply the above pitch by number of\nframes wide and high the screen is.\nThe numbers you get should be devisable by 16x9\nFor default valid values are:\n[<Channel Number>, HDMI 1, HDMI 2, DTV]',
+            Position={576,414}, Size={420, 154}, FontSize=18, CornerRadius=0})
+    elseif CurrentPage == 'Database' then
+        local clusters=props['Number of Clusters'].Value
+        local foxtels=props['Number of Foxtel Boxes'].Value
+        local screens=props['Number of STB'].Value + props['Number of TVs'].Value
+        for i, s in ipairs({'Navigation', 'Cluster', 'Panel', 'Source'}) do
+            layout['Current ' .. s]={ Style='Text', Size={242, 30}, Position={21 + ((i-1) * 250), 51}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+            if s == 'Source' then s='Foxtel' end
+            table.insert(graphics, {Type='Text', Text='Current ' .. s .. ':', Position={21 + ((i-1) * 250), 21}, Size={242, 30}, FontSize=18, HTextAlign='Left'})
+        end
+        local w_sp=1000 / clusters
+        table.insert(graphics, {Type='Text', Text='Cluster Current Preset:', Position={21, 97}, Size={1008, 30}, FontSize=18, HTextAlign='Left'})
+        table.insert(graphics, {Type='Text', Text='Cluster Videowall DB:', Position={21, 173}, Size={1008, 30}, FontSize=18, HTextAlign='Left'})
+        for i=1, clusters do
+            layout['Active Preset ' .. i]={ Style='Text', Size={w_sp - 8, 30}, Position={21 + ((i-1) * w_sp), 127}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+            layout['Cluster DB ' .. i]={ Size={w_sp - 8, 30}, Position={21 + ((i-1) * w_sp), 203}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+        end
+        local w_sp2=1000 / foxtels
+        table.insert(graphics, {Type='Text', Text='Current Foxtel Channels:', Position={21, 249}, Size={1008, 30}, FontSize=18, HTextAlign='Left'})
+        for i=1, foxtels do
+            layout['Active FoxChn ' .. i]={ Style='Text', Size={w_sp2 - 8, 30}, Position={21 + ((i-1) * w_sp2), 279}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+        end
+        table.insert(graphics, {Type='Text', Text='Current STB and TV Channels:  (stb=green, tv=purple)', Position={21, 325}, Size={1008, 30}, FontSize=18, HTextAlign='Left'})
+        local w_sp3=1000 / math.min(screens, 12)
+        local color={110, 240, 170}
+        local pretty='CwP~Stb '
+        for i=1, screens do
+            local y=(i-1) // 12
+            if i > props['Number of STB'].Value then color={170, 110, 240} pretty='Screen~' end
+            layout['Active StbChn ' .. i]={ Style='Text', Size={w_sp3 - 8, 30}, Position={21 + (((i-1) % 12) * w_sp3), 355 + (y * 48)}, FontSize=18, Color=color, Margin=0, Padding=2, StrokeWidth=0}
+            layout['Screen CMD ' .. i]={ Style='Text', PrettyName=pretty .. i, Size={w_sp3 - 8, 10}, Position={21 + (((i-1) % 12) * w_sp3), 385 + (y * 48)}, FontSize=8, Margin=0, Padding=2, StrokeWidth=0}
+        end
+        local cmd_foxtels=math.floor(foxtels / 3 + 0.7) + 2
+        local w_sp4=1000 / cmd_foxtels
+        layout['Input CMD']={ PrettyName='Cmd Input', Size={w_sp4 - 8, 30}, Position={21, 727}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+        layout['Videowall CMD']={ Style='Text', PrettyName='Cmd Videowall', Size={w_sp4 - 8, 30}, Position={21  + w_sp4, 727}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+        for i=1, cmd_foxtels-2 do
+            layout['Foxtel CMD ' .. i]={ Style='Text', PrettyName='Cmd Fox ' .. i, Size={w_sp4 - 8, 30}, Position={21 + ((i + 1) * w_sp4), 727}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+        end
+    else
+        -- All buttons must exist on some layer
+        -- Hence UCI squishing is required
+        if squish_uci or CurrentPage == 'NAVIGATION' then -- 123 - 653
+            for i=0, 5 do
+                layout['FoxChn ' .. (i + 1)]={ Position={96 + (i * 168), 674}, Color={0, 255, 0}, Size={78, 78}, Margin=0, Padding=2, StrokeWidth=0}
+            end
+            layout['Home']={ Position={125, 21}, Size={102, 86}, Margin=0, StrokeWidth=0}
+            layout['Label 1']={ Position={210, 21}, Size={230, 86}, Color={0, 0, 0, 0}, FontSize=30, Margin=0, StrokeWidth=0}
+            layout['Label 2']={ Position={425, 21}, Size={230, 86}, Color={0, 0, 0, 0}, FontSize=30, Margin=0, StrokeWidth=0}
+            layout['Base 1']={ Position={210, 21}, Size={230, 86}, Margin=0, StrokeWidth=0}
+            layout['Base 2']={ Position={425, 21}, Size={230, 86}, Margin=0, StrokeWidth=0}
+            for i=0, 5 do
+                layout['Foxtel ' .. (i + 1)]={ Position={21 + (i * 168), 674}, Size={152, 78}, Margin=0, Padding=20, FontSize=30, HTextAlign='Left', StrokeWidth=0}
+            end
+            layout['STTNGS']={ Position={853, 21}, Size={160, 160}, Margin=0, Padding=2, StrokeWidth=0}
+        end
+        if squish_uci or CurrentPage == 'HOME' then
+            for i=0, 3 do -- 21 - 1024
+                for j=0, 3 do -- 123 - 653
+                    local x=(i * 4) + j + 1
+                    layout['Cluster ' .. x]={ Legend='Cluster ' .. x, FontSize=20, Position={21 + (j * 252), 123 + (i * 136)}, Size={236, 120}, Margin=0, Padding=2, StrokeWidth=0}
+                end
+            end
+        end
+        if squish_uci or CurrentPage == 'CLUSTER' then
+            layout['Render Panel']={ Position={97, 123}, Size={840, 324}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['ON']={ Legend='ON', FontSize=30, Position={21, 503}, Size={152, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['OFF']={ Legend='OFF', FontSize=30, Position={189, 503}, Size={152, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['PRSTS']={ Legend='Video Wall\nPreset Select', FontSize=24, Position={861, 503}, Size={152, 80}, Margin=0, Padding=2, StrokeWidth=0}
+        end
+        if squish_uci or CurrentPage == 'CLUSTER30' then -- 2,3,5,6=30
+            for i=0, 11 do
+                for j=0, 29 do
+                    local x=(i * 30) + j + 1
+                    layout['ScreenTile ' .. x]={ Position={97 + (j * 28), 123 + (i * 27)}, Size={28, 27}, Margin=0, Padding=2, StrokeWidth=0}
+                end
+            end
+        elseif CurrentPage == 'CLUSTER28' then -- 2,4,7  =28
+            for i=0, 11 do
+                for j=0, 27 do
+                    local x=(i * 28) + j + 1
+                    layout['ScreenTile ' .. x]={ Position={97 + (j * 30), 123 + (i * 27)}, Size={30, 27}, Margin=0, Padding=2, StrokeWidth=0}
+            end end
+        end
+        if squish_uci or CurrentPage == 'PRESETS' then
+            table.insert(graphics, {
+                Type='Text', Text='Select a preset to load', Position={97, 115}, FontSize=30, Size={840, 40}})
+            for i=0, 2 do
+                for j=0, 1 do
+                    local x=(i * 2) + j + 1
+                    layout['Preset ' .. x]={ Position={97 + (j * 428), 163 + (i * 170)}, Size={412, 154}, Margin=0, Padding=2, StrokeWidth=0}
+                end
+            end
+        end
+        if squish_uci or CurrentPage == 'MACROS' then
+            for i=0, 3 do
+                for j=0, 3 do
+                    local x=(i * 4) + j + 1
+                    layout['Stb Macro ' .. x]={ Position={21 + (j * 104), 219 + (i * 96)}, Size={88, 80}, Margin=0, Padding=2, StrokeWidth=0}
+                    local x2=(i * 4) + j + 17
+                    layout['Stb Macro ' .. x2]={ Position={613 + (j * 104), 219 + (i * 96)}, Size={88, 80}, Margin=0, Padding=2, StrokeWidth=0}
+                end
+            end
+            if not squish_uci then
+                layout['CH UP']={ Legend='CH UP', FontSize=30, Position={437, 219}, Size={160, 80}, Margin=0, Padding=2, StrokeWidth=0}
+                layout['CH DN']={ Legend='CH DN', FontSize=30, Position={437, 315}, Size={160, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            end
+            layout['CTRLS']={ Legend='Controls', FontSize=30, Position={437, 507}, Size={160, 80}, Margin=0, Padding=2, StrokeWidth=0}
+        end
+        if squish_uci or CurrentPage == 'CONTROLS' then
+            for i=0, 2 do
+                for j=0, 2 do
+                    local x=(i * 3) + j + 1
+                    layout['Number ' .. x]={ Legend="" .. x, FontSize=30, Position={21 + (j * 104), 219 + (i * 96)}, Size={88, 80}, Margin=0, Padding=2, StrokeWidth=0}
+                end
+            end
+            layout['Number 0']={ Legend='0', FontSize=30, Position={125, 507}, Size={88, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['HDMI 1']={ Legend='HDMI 1', FontSize=20, Position={333, 219}, Size={88, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['HDMI 2']={ Legend='HDMI 2', FontSize=20, Position={333, 315}, Size={88, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['DTV']={ Legend='DTV', FontSize=24, Position={333, 507}, Size={88, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['ON']={ Legend='ON', FontSize=30, Position={438, 219}, Size={160, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['OFF']={ Legend='OFF', FontSize=30, Position={438, 315}, Size={160, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['VW SRC']={ Legend='Videowall\nSource', FontSize=30, Position={438, 411}, Size={160, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['MCRS']={ Legend='Macros', FontSize=30, Position={438, 507}, Size={160, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['CH UP']={ Legend='CH UP', FontSize=30, Position={719, 219}, Size={88, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['CH DN']={ Legend='CH DN', FontSize=30, Position={719, 507}, Size={88, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['UP']={ Legend='UP', FontSize=30, Position={823, 266}, Size={88, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['DOWN']={ Legend='DOWN', FontSize=30, Position={823, 462}, Size={88, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['LEFT']={ Legend='LEFT', FontSize=30, Position={719, 365}, Size={88, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['RIGHT']={ Legend='RIGHT', FontSize=30, Position={927, 365}, Size={88, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['OK']={ Legend='OK', FontSize=24, Position={823, 365}, Size={88, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['MENU']={ Legend='MENU', FontSize=24, Position={927, 219}, Size={88, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['EXIT']={ Legend='EXIT', FontSize=24, Position={927, 507}, Size={88, 80}, Margin=0, Padding=2, StrokeWidth=0}
+        end
+        if squish_uci or CurrentPage == 'FOXCTRL' then
+            for i=0, 3 do
+                for j=0, 3 do
+                    local x=(i * 4) + j + 1
+                    layout['Fox Macro ' .. x]={ Position={21 + (j * 150), 219 + (i * 96)}, Size={134, 80}, Margin=0, Padding=2, StrokeWidth=0}
+                end
+            end
+            if not squish_uci then
+                for i=0, 10 do
+                    layout['Number ' .. i]={ Legend='' .. i, FontSize=30, Position={21 + (i * 100), 123}, Size={84, 80}, Margin=0, Padding=2, StrokeWidth=0}
+                end
+                layout['CH UP']={ Legend='CH UP', FontSize=24, Position={721, 219}, Size={84, 80}, Margin=0, Padding=2, StrokeWidth=0}
+                layout['CH DN']={ Legend='CH DN', FontSize=24, Position={721, 507}, Size={84, 80}, Margin=0, Padding=2, StrokeWidth=0}
+                layout['UP']={ Legend='UP', FontSize=24, Position={821, 266}, Size={84, 80}, Margin=0, Padding=2, StrokeWidth=0}
+                layout['DOWN']={ Legend='DOWN', FontSize=24, Position={821, 462}, Size={84, 80}, Margin=0, Padding=2, StrokeWidth=0}
+                layout['LEFT']={ Legend='LEFT', FontSize=24, Position={721, 365}, Size={84, 80}, Margin=0, Padding=2, StrokeWidth=0}
+                layout['RIGHT']={ Legend='RIGHT', FontSize=24, Position={921, 365}, Size={84, 80}, Margin=0, Padding=2, StrokeWidth=0}
+                layout['OK']={ Legend='OK', FontSize=24, Position={821, 365}, Size={84, 80}, Margin=0, Padding=2, StrokeWidth=0}
+                layout['MENU']={ Legend='MENU', FontSize=24, Position={921, 219}, Size={84, 80}, Margin=0, Padding=2, StrokeWidth=0}
+                layout['EXIT']={ Legend='EXIT', FontSize=24, Position={921, 507}, Size={84, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            end
+        end
+        if squish_uci or CurrentPage == 'VWSOURCE' then
+            for i=0, 3 do -- 21 - 1024
+                for j=0, 3 do -- 123 - 653
+                    local x=(i * 4) + j + 1
+                    layout['Source ' .. x]={ Legend='Source ' .. x, FontSize=20, Position={21 + (j * 252), 123 + (i * 136)}, Size={236, 120}, Margin=0, Padding=2, StrokeWidth=0}
+                end
+            end
+        end
+        if squish_uci or CurrentPage == 'SETTINGS' then
+            for i=0, 2 do
+                for j=0, 1 do
+                    local x=(i * 2) + j + 1
+                    layout['Videowall Label ' .. x]={ Text='Videowall ' .. x .. ' Brightness', Position={189 + (j * 422), 163 + (i * 170)}, Size={406, 40}, Margin=0, Padding=2, StrokeWidth=0}
+                    layout['Videowall Brightness ' .. x]={ Style='Fader', Position={189 + (j * 422), 213 + (i * 170)}, Size={406, 80}, Color={255, 240, 45, 0}, Margin=0, Padding=2, StrokeWidth=0}
+                end
+            end
+        end
+    end
+    return layout, graphics
+end
+-- Define the color of the plugin object in the design
+function GetColor(props) return {100, 0, 155} end
+-- The name that will initially display when dragged into a design
+function GetPrettyName(props) return 'AV Control Interface V4' end
+-- Define User configurable Properties of the plugin
+function GetProperties()
+    local props={}
+    table.insert(props, {Name='Render Width', Type='integer', Min=256, Max=1920, Value=840})
+    table.insert(props, {Name='Render Height', Type='integer', Min=144, Max=1080, Value=324})
+    table.insert(props, {Name='Number of STB', Type='integer', Min=0, Max=400, Value=1})
+    table.insert(props, {Name='Number of TVs', Type='integer', Min=0, Max=50, Value=0})
+    table.insert(props, {Name='Number of Foxtel Boxes', Type='integer', Min=0, Max=8, Value=0})
+    table.insert(props, {Name='Number of Clusters', Type='integer', Min=1, Max=16, Value=1})
+    table.insert(props, {Name='Regions Pixel Padding', Type='integer', Min=0, Max=4, Value=1})
+    table.insert(props, {Name='Edges Pixel Padding', Type='integer', Min=0, Max=4, Value=0})
+    table.insert(props, {Name='Link Clusters Direction', Type='enum', Value='Odd then Even', Choices={'Odd then Even', 'Even then Odd', 'Odd above Even', 'Even above Odd'}})
+    table.insert(props, {Name='Override Layout', Type='boolean', Value=false})
+    for i=1, 15, 2 do
+        table.insert(props, {Name='' .. i .. ' linked with ' .. (i + 1), Type='boolean', Value=false})
+    end
+    table.insert(props, {Name='Limit of Screens', Type='integer', Min=1, Max=24, Value=12})
+    table.insert(props, {Name='Limit of Regions', Type='integer', Min=1, Max=24, Value=12})
+
+    table.insert(props, {Name='Hide off control', Type='enum', Value='If Presets enabled', Choices={'Always', 'If Presets enabled', 'Never'}})
+    table.insert(props, {Name='Clear Cmd Input', Type='boolean', Value=true})
+    table.insert(props, {Name='Disable Settings', Type='boolean', Value=true})
+    table.insert(props, {Name='Hide UCI layers', Type='boolean', Value=true})
+    table.insert(props, {Name='Debug Print', Type='enum', Value='None', Choices={'None', 'Tx/Rx', 'Tx', 'Rx', 'Function Calls', 'All'}})
+    return props
+end
+-- Optional function to update available properties when properties are altered by the user
+function RectifyProperties(props)
+    for i=1, 15, 2 do
+        props['' .. i .. ' linked with ' .. (i + 1)].IsHidden =
+            (props['Number of Clusters'].Value - 1 < i)
+    end
+    props['Debug Print'].IsHidden=(props.plugin_show_debug.Value == false)
+    return props
+end
+-- Start event based logic
+if Controls then
+    DG_DG, DG_FN, DG_TX, DG_RX= 1,2,3,4
+    function dbg(m, s)
+        local mode=Properties['Debug Print'].Value -- {'None', 'Tx/Rx', 'Tx', 'Tx', 'Function Calls', 'All'}
+        if mode == 'Function Calls' and m == DG_FN then print(s)
+        elseif mode == 'Tx' and m == DG_TX then print(s)
+        elseif mode == 'Rx' and m == DG_RX then print(s)
+        elseif mode == 'Tx/Rx' and m >= DG_TX then print(s)
+        elseif mode == 'All' then print(s) end
+    end
+    EzSVG=require('EzSVG')
+    CLUSTERS, FOXTELS, REGIONS=Properties['Number of Clusters'].Value, Properties['Number of Foxtel Boxes'].Value, Properties['Limit of Regions'].Value
+    EDITING=1
+    DB={}
+    CLSTR_NAME={}
+    CLUSTERS_ID={}
+    PRESETS_ID={}
+    SCREEN_MAPS={}
+    SCREENS_ID={['']=0, ['None']=0}
+    CTRL_LIST_RESCAN={'control=EXIT', 'idle:10',
+                        'control=MENU', 'control=UP', 'control=OK', 'idle:10',
+                        'control=DOWN', 'control=DOWN', 'control=RIGHT', 'control=OK',
+                        'idle:30', 'control=OK', 'idle:10', 'control=OK'}
+
+    -- QUEUE
+    function queue_add(queue, value)
+        local last=(queue.last or -1) + 1
+        queue.last=last
+        queue[last]=value
+        if (queue.len == nil or queue.len < 1) and type(queue.start) == 'function' then
+            queue:start()
+        end
+        queue.len=(queue.len or 0) + 1
+    end
+    function queue_pop(queue)
+        local first=(queue.first or 0)
+        if first > queue.last then
+            return nil
+        end
+        local value=queue[first]
+        queue[first]=nil -- to allow garbage collection
+        queue.first=first + 1
+        queue.len=queue.len - 1
+        if queue.len < 1 and type(queue.stop) == 'function' then
+            queue:stop()
+        end
+        return value
+    end
+    function queue_len(queue)
+        if queue.len then return queue.len end
+        return (queue.last or -1) + 1 - (queue.first or 0)
+    end
+    function queue_start()
+        dbg(DG_FN, 'queue_start')
+        QueueTimer=Timer.New()
+        QueueTimer.EventHandler=queue_exec
+        QueueTimer:Start(0.2)
+    end
+    function queue_stop()
+        dbg(DG_FN, 'queue_stop')
+        if QueueTimer then QueueTimer:Stop() end
+        QueueTimer=nil
+    end
+    function queue_exec()
+        -- Export commands to the H2
+        if queue_len(QUEUE[QUE_CLUSTER]) > 0 then
+            local cmd=queue_pop(QUEUE[QUE_CLUSTER])
+            dbg(DG_TX, 'running novastar cmd '..cmd)
+            set_cmd(Controls['Videowall CMD'], cmd)
+        end
+
+        -- Control the screens and STBs
+        if queue_len(QUEUE[QUE_STB]) > 0 then
+            local screen, cmd=table.unpack(queue_pop(QUEUE[QUE_STB]))
+            dbg(DG_TX, 'running screen '..tbl_dump(screen)..' cmd '..cmd)
+            if Controls['Screen CMD'][screen] then set_cmd(Controls['Screen CMD'][screen], cmd) end
+        end
+
+        -- Control the Foxtels
+        if queue_len(QUEUE[QUE_SOURCE]) > 0 then
+            local source, cmd=table.unpack(queue_pop(QUEUE[QUE_SOURCE]))
+            local irhead=(source % 3)
+            if irhead == 0 then irhead=3 end
+            local globalcache=math.floor(source / 3 + 0.7)
+            local cmd=string.format('irhead=%d, %s', irhead, cmd)
+            dbg(DG_TX, 'running global cache '..globalcache..' ir '..irhead..' cmd '..cmd)
+            if Controls['Foxtel CMD'][globalcache] then set_cmd(Controls['Foxtel CMD'][globalcache], cmd) end
+        end
+    end
+    -- The following contains helper methods for the program
+    function set_layer(LAYER, ACTIVE, MODE)
+        local uci_name, cur_page=Controls['UCI Name'].String, Controls['UCI Page'].String
+        local err = (not pcall(Uci.SetLayerVisibility, cur_page, LAYER, ACTIVE, MODE)) and (not pcall(Uci.SetLayerVisibility, uci_name, cur_page, LAYER, ACTIVE, MODE))
+        -- set_legends('Error: changing\nUCI layer', 'Check name: "'..uci_name..'"\nand page: "'..cur_page..'"')
+        if err then print('Failed to set UCI layer, Check name: "'..uci_name..'" and page: "'..cur_page..'"') end
+    end
+    function set_layers_instant(tbl)
+        local UCI_NAME, CUR_PAGE=Controls['UCI Name'].String, Controls['UCI Page'].String
+        for LAYER, ACTIVE in pairs(tbl) do set_layer(LAYER, ACTIVE, 'none')
+    end end
+    function set_cmd(ctrl, cmd) if ctrl.String == cmd then ctrl.String=' ' .. cmd else ctrl.String=cmd end end
+    function draw_svg(ctrl, data) ctrl.Legend='{"DrawChrome":false,"IconData":"'..data..'"}' end
+    function get_floor_ctrl(ctrl) if ctrl then return math.floor(ctrl.Value) else return 0 end end
+    function set_legends(root, page)
+        if root == nil or root=='' then root='HOME' end
+        Controls['Label 1'].Legend=root
+        local part2=page == nil or page==''
+        Controls['Base 2'].IsInvisible=part2
+        Controls['Label 2'].IsInvisible=part2
+        if not part2 then
+            Controls['Label 2'].Legend=page
+            pcall(function() 
+                Controls['Base 2'].CssClass='bc_even transparent'
+                Controls['Label 2'].CssClass='transparent'
+            end)
+        end
+    end
+    function cluster_ctrl(ctrl, cluster_id)
+        for i, c in pairs(Controls['Cluster Id']) do
+            if c.Value == cluster_id then return Controls[ctrl][i] end
+        end
+    end
+    function check_ip(val)
+        local chunks = {string.match(val, "(%d+)%.(%d+)%.(%d+)%.(%d+)")}
+        if (#chunks == 4) then
+            for _, v in pairs(chunks) do
+                if (tonumber(v) < 0 or tonumber(v) > 255) then
+                    return nil;
+            end end
+            return chunks;
+        else return nil;
+    end end
+    DB_ID, DB_OFFST, DB_PSTNM, DB_RGN, DB_VWO, DB_LYRO, DB_NAMES, DB_PRST=1,2,4,4,5,6,7,8
+    -- DB_ID, DB_OFFST, DB_W, DB_H, DB_VWO, DB_LYRO, DB_NAMES, DB_PRST + n
+    -- DB_X, DB_Y, DB_W, DB_RGN + n
+    DB_X, DB_Y, DB_W, DB_H, DB_SRC, DB_DEF, DB_OVR=1,2,3,4,5,6,7
+    -- DB = {
+    --   [cluster_id] = {
+    --     id, offset, width, height, layer_offset, videowall_offset, names[]
+    --     [preset_id] = {
+    --       offset_x, offset_y, collumns, preset_name
+    --       [region_id] = {
+    --         x, y, w, h, source, default, (override) -- override is should not be saved to the DB
+    -- } } } }
+    function db_set(cluster_id, key, val)
+        if cluster_id > 0 then
+            dbg(DG_DG, 'db_set'..cluster_id, key, val)
+            if not DB[cluster_id] then DB[cluster_id]={} end
+            DB[cluster_id][key]=val
+            dbg(DG_DG, 'db_set'..tbl_dump(DB[cluster_id]))
+            Controls['Cluster DB'][cluster_id].String=tbl_dump(DB[cluster_id])
+        end
+    end
+    function db_check_valid(i)
+        local ctrl=cluster_ctrl('Number of Presets', i)
+        if i == 0 or not ctrl then return end
+        local move_preset,start_preset=0,0
+        local moves = {}
+        local num_presets=ctrl.Value
+        local region_limit = Properties['Limit of Regions'].Value
+        for Ci, Cv in pairs(DB[i]) do
+            if type(Cv) == 'table' then
+                -- dbg(DG_FN, 'db_check_valid '..i..' preset '..Ci..' '..tbl_dump(Cv[1]))
+                if Ci < DB_PRST and move_preset < DB_PRST - Ci and type(Cv[1]) ~= 'string' then
+                    move_preset = DB_PRST - Ci
+                    start_preset = Ci
+                elseif Ci < DB_NAMES and move_preset < DB_NAMES - Ci then
+                    move_preset = DB_NAMES - Ci
+                    start_preset = Ci
+                end
+            end
+        end
+        if move_preset > 0 and start_preset > 0 and #DB[i] >= start_preset then
+            -- dbg(DG_FN, 'db_check_valid '..i..' move_preset '..move_preset..' start_preset '..start_preset)
+            for idx=0, move_preset-1 do table.insert(DB[i], start_preset+idx, 0) end
+            if num_presets > 0 and (not DB[i][DB_PRST] or DB[i][DB_PRST][DB_PSTNM] ~= 'Off Preset') then 
+                table.insert(DB[i], DB_PRST, {[DB_X]=0, [DB_Y]=0, [DB_W]=28, [DB_PSTNM]='Off Preset'})
+        end end
+        for prst_idx, prst_val in pairs(DB[i]) do
+            if prst_idx >= DB_PRST and type(prst_val) == 'table' then
+                local move_region=0
+                for rgn_idx, rgn_val in pairs(prst_val) do
+                    if rgn_idx <= DB_RGN and type(rgn_val) == 'table' and move_region <  DB_RGN+1 - rgn_idx then
+                        move_region = DB_RGN+1 - rgn_idx
+                        moves[prst_idx] = {move_region, rgn_idx}
+                    end
+                end
+            end
+        end
+        for prst_idx, val in pairs(moves) do
+            local move_region, start_region = val[1], val[2]
+            if move_region > 0 and start_region > 0 and #DB[i][prst_idx] >= start_region then
+                dbg(DG_FN, 'db_check_valid '..i..' preset '..prst_idx..' move_region '..move_region..' start_region '..start_region)
+                for idx=0, move_region-1 do table.insert(DB[i][prst_idx], start_region+idx, 0) 
+        end end end
+        if move_preset > 0 or #moves > 0 then
+            Controls['Cluster DB'][i].String=tbl_dump(DB[i])
+        end
+    end
+    function db_read(i, data)
+        DB[i]=eval(data)
+        if DB[i] and type(DB[i]) == 'table' then return true
+        else DB[i]={[DB_ID]=i,[DB_OFFST]=0} return false end
+    end
+    function db_init()
+        for i, c in pairs(Controls['Cluster DB']) do
+            if db_read(i, c.String) then db_check_valid(i) end
+            c.EventHandler = function(c) db_read(i, c.String) end
+        end
+    end db_init()
+    function get_diff(width, height)
+        local render_w, render_h=Properties['Render Width'].Value, Properties['Render Height'].Value
+        if (width / height) < (render_w / render_h) then
+            local offset = math.floor(((height * render_w / render_h) - width) / 2 + 0.5)
+            dbg(DG_FN, '[PAD SIDES] offset: '..offset)
+            return offset, 0
+        else
+            local offset = math.floor(((width * render_h / render_w) - height) / 2 + 0.5)
+            dbg(DG_FN, '[PAD TOP/BOTTOM] offset: '..offset)
+            return 0, offset
+        end
+    end
+    function local_coord(coord, seg, size, delta)
+        -- local l=size + delta*2
+        local s=(size + delta*2) / seg
+        return math.min(math.max(0, coord * s - delta), size)
+    end
+    function local_v2(x, y, rw, dx, dy, w, h)
+        -- local render_w, render_h=Properties['Render Width'].Value, Properties['Render Height'].Value
+        x,y = x*(w+2*dx)/rw-dx, y*(h+2*dy)/12-dy
+        -- if dx ~= 0 and dy ~= 0 then
+        --     if dx < 10 then x,y = x*dx,y*dx+dy 
+        --     else x,y = x*dy+dx,y*dy end
+        -- end
+        return math.min(math.max(0, x), w), math.min(math.max(0, y), h)
+    end
+    function cluster_linked(cluster_id)
+        if cluster_id % 2 == 0 then cluster_id=cluster_id - 1 end
+        local prop = Properties[cluster_id..' linked with '..(cluster_id+1)]
+        return prop and prop.Value
+    end
+    function cluster_to_panel_id(cluster_id)
+        -- print('cluster_to_panel_id', cluster_id)
+        if cluster_id % 2 == 0 and cluster_linked(cluster_id) then cluster_id=cluster_id - 1 end
+        -- if cluster_id > 1 then
+        --     -- if cluster_id % 2 == 0 then cluster_id=cluster_id + 1 end 
+        --     for i=1, cluster_id, 2 do
+        --         if Properties[i..' linked with '..(i+1)].Value then cluster_id = cluster_id - 1
+        -- end end end
+        return cluster_id
+    end
+    -- Methods only used in designer
+    function eval_ctrl(ctrl, w, h)
+        if ctrl.String == '' then return 0 end
+        if string.find(ctrl.String, '[wh]') then
+            for k, v in pairs({['w']=w, ['h']=h}) do
+                ctrl.String = string.gsub(ctrl.String, k, v)
+        end end
+        if string.find(ctrl.String, '[*/%-+]') then
+            local n = eval(ctrl.String)
+            if n == math.floor(n) then n = math.floor(n) end
+            ctrl.String = n
+            return n
+        end
+        return tonumber(ctrl.String)
+    end
+    function redraw_preview()
+        local p_w=get_floor_ctrl(Controls['Panels Width'])
+        local p_h=get_floor_ctrl(Controls['Panels Height'])
+        local doc=nil
+        if p_w > 0 and p_h > 0 then doc=EzSVG.Document(p_w, p_h, 'dimgray')
+        else doc=EzSVG.Document(3360, 1296) end
+        for i=1, REGIONS do
+            local clr=string.format('#%02x%02x%02x', CLR_REGIONS[i][1], CLR_REGIONS[i][2], CLR_REGIONS[i][3])
+            EzSVG.setStyle({fill=clr, stroke_width=8, stroke='dimgray'})
+            local x=eval_ctrl(Controls['Region X'][i], p_w,p_h)
+            local y=eval_ctrl(Controls['Region Y'][i], p_w,p_h)
+            local w=eval_ctrl(Controls['Region Width'][i], p_w,p_h)
+            local h=eval_ctrl(Controls['Region Height'][i], p_w,p_h)
+            if w > 1 and h > 1 then
+                doc:add(EzSVG.Rect(tonumber(x), tonumber(y), tonumber(w), tonumber(h)))
+            end
+        end
+        local b64=Crypto.Base64Encode(doc:toString())
+        draw_svg(Controls['VideowallRender'], b64)
+    end
+    function quick_draw_regions(width, height, regions, preview)
+        local doc=nil
+        if width==0 and height==0 then width=3072 height=1152 end
+        doc=EzSVG.Document(width, height, 'dimgray')
+        for i, r in pairs(regions or {}) do
+            if i > DB_RGN then
+                if preview then EzSVG.setStyle({stroke_width=8, stroke='dimgray',
+                    fill=string.format('#%02x%02x%02x', CLR_REGIONS[i][1], CLR_REGIONS[i][2], CLR_REGIONS[i][3])})
+                else EzSVG.setStyle({fill='#ffffff', stroke_width=8, stroke='dimgray'}) end
+                local x, y, w, h=r[1], r[2], r[3], r[4]
+                if type(x)=='number' and type(y)=='number' and type(w)=='number' and type(h)=='number' then 
+                    if x <= 1 then x=width * x end
+                    if y <= 1 then y=height * y end
+                    if w <= 1 then w=width * w end
+                    if h <= 1 then h=height * h end
+                    doc:add(EzSVG.Rect(x, y, w, h))
+                end 
+            end
+        end
+        return Crypto.Base64Encode(doc:toString())
+    end
+    function recalculate_offsets()
+        local offsets={}
+        for i=1, 16 do offsets[get_floor_ctrl(Controls['Cluster Id'][i])]=get_floor_ctrl(Controls['Number of Screens'][i]) end
+        local running_total=0
+        for i=1, 16 do
+            if offsets[i] then
+                if not DB[i] then DB[i]={[DB_ID]=i} end
+                DB[i][DB_OFFST]=running_total
+                if not (i%2 > 0 and Properties[i..' linked with '..(i+1)].Value)then
+                    running_total=running_total + offsets[i]
+                end
+            end
+        end
+    end
+    function shorten_name(name, len)
+        name = string.gsub(name, '&', '')
+        if name == ' ' or name == '0' or type(name) ~= 'string' then name='' end
+        if #name > len then
+            name = string.sub(name, 1, len)
+            Controls['Preset Pretty'].String = name
+            Controls['Preset Pretty'].Color='#ff6969'
+        else
+            Controls['Preset Pretty'].Color='#69ff69'
+        end
+        return name
+    end
+    function save_preset_to_db()
+        local cluster_id=Controls['Editing Cluster'].Value
+        local preset_id=Controls['Editing Preset'].Value
+        local num_presets=cluster_ctrl('Number of Presets', cluster_id).Value
+        local linked=cluster_linked(cluster_id)
+        if cluster_id > 0 and (preset_id > 0 or num_presets == 0) then
+            local width=get_floor_ctrl(Controls['Panels Width'])
+            local height=get_floor_ctrl(Controls['Panels Height'])
+            local dx, dy=get_diff(width, height)
+            local pw=RENDER_ID[Controls['Panel Divisions'].String] or 28
+            local name = Controls['Preset Pretty'].String
+            if linked then name=shorten_name(name, 4) else name=shorten_name(name, 12) end
+            local data={[DB_X]=dx, [DB_Y]=dy, [DB_W]=pw, [DB_PSTNM]=name}
+            if name == '' or name == ' ' or name == '0' then data[DB_PSTNM]=nil end
+            for r=1, REGIONS do
+                if (Controls['Region X'][r].String ~= '' and Controls['Region Y'][r].String ~= '' and
+                    Controls['Region Width'][r].String ~= '' and Controls['Region Height'][r].String ~= '') then
+                    data[DB_RGN + r]={ [DB_X]=tonumber(Controls['Region X'][r].String),
+                        [DB_Y]=tonumber(Controls['Region Y'][r].String),
+                        [DB_W]=tonumber(Controls['Region Width'][r].String),
+                        [DB_H]=tonumber(Controls['Region Height'][r].String)}
+                    local src=Controls['Region Source'][r].String
+                    if src ~= '' and SCREENS_ID[src] then
+                        data[DB_RGN + r][DB_SRC]=SCREENS_ID[src]
+                    else data[DB_RGN + r][DB_SRC]=r end
+                    local def=Controls['Region Default'][r].String
+                    if def ~= '' then
+                        if def == 'DTV' or string.find(def, 'HDMI %d') then data[DB_RGN + r][DB_DEF]=def
+                        else data[DB_RGN + r][DB_DEF]=tonumber(def) end
+                    end
+                elseif (Controls['Region Source'][r].String ~= '' and Controls['Region Default'][r].String ~= '') then
+                    data[DB_RGN + r]={}
+                    local src=Controls['Region Source'][r].String
+                    if src ~= '' and SCREENS_ID[src] then
+                        data[DB_RGN + r][DB_SRC]=SCREENS_ID[src]
+                    else data[DB_RGN + r][DB_SRC]=r end
+                    local def=Controls['Region Default'][r].String
+                    if def ~= '' then
+                        if def == 'DTV' or string.find(def, 'HDMI %d') then data[DB_RGN + r][DB_DEF]=def
+                        else data[DB_RGN + r][DB_DEF]=tonumber(def) end
+                    end
+            end end
+            local vwo=math.floor(Controls['Videowall Source Offset'].Value)
+            local lyro=math.floor(Controls['Videowall Layer Offset'].Value)
+            DB[cluster_id][DB_VWO]=vwo
+            DB[cluster_id][DB_LYRO]=lyro
+            db_set(cluster_id, DB_PRST+preset_id, data)
+        -- elseif cluster_id > 0 then db_set(cluster_id, DB_PRST+preset_id, nil)
+        end
+    end
+    function save_source_pretty_to_db(i, ctrl)
+        local cluster_id=Controls['Editing Cluster'].Value
+        local names = DB[cluster_id][DB_NAMES] or {}
+        if type(names) ~= 'table' then names={} end
+        if ctrl.String == '' or ctrl.String == ' ' or ctrl.String == '0' then names[i]=nil 
+        else names[i]=ctrl.String end
+        db_set(cluster_id, DB_NAMES, names)
+        local num_screens=get_floor_ctrl(cluster_ctrl('Number of Screens', cluster_id))
+        local num_presets=get_floor_ctrl(cluster_ctrl('Number of Presets', cluster_id))
+        set_screen_choices(cluster_id, num_screens, num_presets)
+    end
+    function find_missing_custer_id()
+        local found={}
+        for i, c in pairs(Controls['Cluster Id']) do
+            if c.Value > 0 then
+                found[c.Value]=i
+            end
+        end
+        if #found == 0 then return 1 end
+        local prev=0
+        for v, _ in pairs(found) do
+            if v > prev + 1 then
+                return prev + 1
+            end
+            prev=v
+        end
+        if CLUSTERS > prev then return prev + 1 end
+        return 0
+    end
+    function update_visiblity_cluster_setup(i, state)
+        Controls['Cluster Name'][i].IsInvisible=state
+        Controls['Number of Presets'][i].IsInvisible=state
+        Controls['Number of Screens'][i].IsInvisible=state
+        Controls['Cluster'][i].IsInvisible=state
+    end
+    function find_matching_custer_id(val, idx)
+        for i, c in pairs(Controls['Cluster Id']) do
+            if c.Value == val and i ~= idx then return i end
+        end
+        return 0
+    end
+    function set_preset_choices(num_presets)
+        local preset_choices={}
+        for i=1, num_presets do
+            local name = (DB[Controls['Editing Cluster'].Value][DB_PRST+i]or{})[DB_PSTNM]
+            if name then name = i..' '..name else name = 'Preset '..i end
+            table.insert(preset_choices, name)
+            PRESETS_ID[name]=i
+        end
+        table.insert(preset_choices, 'Add Preset')
+        PRESETS_ID['Add Preset']=num_presets + 1
+        Controls['Select Preset'].Choices=preset_choices
+    end
+    function set_screen_choices(cluster_id, num_screens, num_presets, current)
+        local screen_choices={}
+        local label='Screen'
+        if num_presets > 0 then label='STB' end
+        local offset=DB[cluster_id][DB_OFFST] or 0
+        table.insert(screen_choices, '')
+        table.insert(screen_choices, 'None')
+        local names = DB[cluster_id][DB_NAMES] or {}
+        if type(names) ~= 'table' then names={} end
+        for i=1, num_screens do
+            local title = names[i] or label..' '..(offset+i)
+            table.insert(screen_choices, title)
+            SCREENS_ID[title]=i
+        end
+        table.insert(screen_choices, 'Add '..label)
+        SCREENS_ID['Add '..label]=num_screens + 1
+        for i=1, REGIONS do Controls['Region Source'][i].Choices=screen_choices end
+        if current then current.String=label..' '..(offset+num_screens) end
+    end
+    -- EVENTHANDLERS
+    function videowall_select_cluster(ctrl)
+        local name = string.gsub(ctrl.String, "\\n", " ")
+        local cluster_id=CLUSTERS_ID[name] or 0
+        Controls['Editing Cluster'].Value=cluster_id
+        Controls['Select Preset'].String=''
+        local num_screens=get_floor_ctrl(cluster_ctrl('Number of Screens', cluster_id))
+        local num_presets=get_floor_ctrl(cluster_ctrl('Number of Presets', cluster_id))
+        set_screen_choices(cluster_id, num_screens, num_presets)
+        if DB[cluster_id] then
+            Controls['Videowall Source Offset'].Value=DB[cluster_id][DB_VWO] or 0
+            Controls['Videowall Layer Offset'].Value=DB[cluster_id][DB_LYRO] or 0
+            for i, s in pairs({[DB_W]='Panels Width', [DB_H]='Panels Height'}) do
+                if DB[cluster_id][i] then Controls[s].Value=DB[cluster_id][i]
+                else Controls[s].Value=0 end
+            end
+            local names = DB[cluster_id][DB_NAMES] or {}
+            if type(names) ~= 'table' then names={} end
+            for i=1, num_screens do
+                Controls['Source Pretty'][i].String=names[i] or ''
+            end
+        end
+        if num_presets == 0 then
+            PRESETS_ID={['Auto Layout']=0, ['Add Preset']=1}
+            Controls['Select Preset'].Choices={'Add Preset'}
+        end
+        if num_presets > 0 then
+            set_preset_choices(num_presets)
+            local name = (DB[Controls['Editing Cluster'].Value][DB_PRST+1]or{})[DB_PSTNM]
+            if name then name = '1 '..name else name = 'Preset 1' end
+            Controls['Select Preset'].String=name
+            videowall_select_preset(Controls['Select Preset'])
+        elseif num_screens < 9 then
+            if Controls['Panels Width'].Value == 0 then Controls['Panels Width'].Value=SCREEN_SIZES[num_screens][1] end
+            if Controls['Panels Height'].Value == 0 then Controls['Panels Height'].Value=SCREEN_SIZES[num_screens][2] end
+            if DB[cluster_id][DB_PRST] and DB[cluster_id][DB_PRST][DB_W] then Controls['Panel Divisions'].String=(DB[cluster_id][DB_PRST][DB_W] or '28')..' Divisions'
+            else Controls['Panel Divisions'].String=(SCREEN_SIZES[num_screens][3] or '28')..' Divisions' end
+            local p_w=get_floor_ctrl(Controls['Panels Width'])
+            local p_h=get_floor_ctrl(Controls['Panels Height'])
+            local svg=quick_draw_regions(p_w, p_h, QCK_REGIONS[SCREEN_LAYOUTS[num_screens]], true)
+            draw_svg(Controls['VideowallRender'], svg)
+            Controls['Select Preset'].String='Auto Layout'
+            videowall_select_preset(Controls['Select Preset'])
+        end
+    end
+    function videowall_select_preset(ctrl)
+        dbg(DG_FN, 'videowall_select_preset'..tbl_dump(PRESETS_ID))
+        local preset_id=math.floor(PRESETS_ID[ctrl.String])
+        local cluster_id=Controls['Editing Cluster'].Value
+        Controls['Editing Preset'].Value=preset_id
+        Controls['Preset Quick Regions'].String=''
+        if ctrl.String == 'Add Preset' then
+            cluster_ctrl('Number of Presets', cluster_id).Value=preset_id
+            set_preset_choices(preset_id)
+            ctrl.String='Preset '..preset_id
+        end
+        local keys={[DB_X]='X', [DB_Y]='Y', [DB_W]='Width', [DB_H]='Height', [DB_SRC]='Source', [DB_DEF]='Default'}
+        local num_presets=get_floor_ctrl(cluster_ctrl('Number of Presets', cluster_id))
+        local num_screens=get_floor_ctrl(cluster_ctrl('Number of Screens', cluster_id))
+        local offset=DB[cluster_id][DB_OFFST] or 0
+        local data={}
+        local label='STB'
+        if preset_id == 0 then label='Screen' end
+        if DB[cluster_id] and DB[cluster_id][DB_PRST+preset_id] then data=DB[cluster_id][DB_PRST+preset_id] end
+        local name = data[DB_PSTNM] or ''
+        if linked then name=shorten_name(name, 4) else name=shorten_name(name, 12) end
+        Controls['Preset Pretty'].String=name
+        Controls['Panel Divisions'].String=(data[DB_W] or '28')..' Divisions'
+        for r=1, REGIONS do
+            for k, s in pairs(keys) do
+                if data[r+DB_RGN] then
+                    local current = data[r+DB_RGN][k]
+                    if k == DB_SRC then
+                        local names = DB[cluster_id][DB_NAMES] or {}
+                        if type(names) ~= 'table' then names={} end
+                        local pretty_name = names[current]
+                        if current == 0 then Controls['Region '..s][r].String='None'
+                        elseif current ~= nil then Controls['Region '..s][r].String=pretty_name or label..' '..(offset+current)
+                        elseif cluster_id%2 == 0 and cluster_linked(cluster_id) then 
+                            Controls['Region '..s][r].String=pretty_name or label..' '..(offset+num_screens-r)
+                        else Controls['Region '..s][r].String=pretty_name or label..' '..(offset+r) end
+                    elseif current then Controls['Region '..s][r].String=pretty_name or ''..current
+                    else Controls['Region '..s][r].String='' end
+                else Controls['Region '..s][r].String='' end
+            end
+        end
+        redraw_preview()
+    end
+    function videowall_select_source(ctrl)
+        if string.find(ctrl.String, 'Add ') then
+            local cluster_id=Controls['Editing Cluster'].Value
+            local num_presets=get_floor_ctrl(cluster_ctrl('Number of Presets', cluster_id))
+            local screens=cluster_ctrl('Number of Screens', cluster_id)
+            local num_screens=get_floor_ctrl(screens) + 1
+            screens.Value=num_screens
+            if num_presets == 0 then
+                local idx = find_matching_custer_id(cluster_id, 0)
+                setup_cluster_screens(screens, idx, cluster_id, num_presets)
+                Controls['Panels Width'].Value=DB[cluster_id][DB_W]
+                Controls['Panels Height'].Value=DB[cluster_id][DB_H]
+                videowall_select_preset(Controls['Select Preset'])
+                recalculate_offsets()
+            else
+                recalculate_offsets()
+                set_screen_choices(cluster_id, num_screens, num_presets, ctrl)
+            end
+        end
+        save_preset_to_db()
+    end
+    function videowall_quick_regions(ctrl)
+        local cluster_id=get_floor_ctrl(Controls['Editing Cluster'])
+        if Controls['Panels Width'].Value == 0 then Controls['Panels Width'].Value=3072 db_set(cluster_id, DB_W, 3072) end
+        if Controls['Panels Height'].Value == 0 then Controls['Panels Height'].Value=1152 db_set(cluster_id, DB_H, 1152) end
+        local p_w=get_floor_ctrl(Controls['Panels Width'])
+        local p_h=get_floor_ctrl(Controls['Panels Height'])
+        local regions=QCK_REGIONS[ctrl.String]
+        Controls['Preset Pretty'].String=ctrl.String
+        for i=1, REGIONS do
+            if regions[i] then
+                Controls['Region Source'][i].String='Auto'
+                Controls['Region Default'][i].String=''
+                for j, s in pairs({'X', 'Y', 'Width', 'Height'}) do
+                    if j % 2 == 0 then Controls['Region '..s][i].String=math.floor(p_h * regions[i][j])
+                    else Controls['Region '..s][i].String=math.floor(p_w * regions[i][j]) end
+                end 
+            else for _, s in pairs({'X', 'Y', 'Width', 'Height', 'Source', 'Default'}) do
+                    Controls['Region '..s][i].String=''
+            end end
+        end
+        redraw_preview()
+        save_preset_to_db()
+    end
+    function setup_macros(ctrl, i)
+        local class=ctrl.String
+        local chn  =Controls['Macro Channel'][i].String
+        if  class==' ' then Controls['Macro Channel'][i].String=''
+        elseif chn=='' then Controls['Macro Channel'][i].String=''..DEFAULT_CHN[class] end
+        
+        if ctrl.String ~= ' ' then
+            pcall(function() Controls['Stb Macro'][i].CssClass='btn '..ctrl.String end)
+        end
+        -- Controls['Stb Macro'][i].CssClass='btn'..ctrl.String
+        Controls['Stb Macro'][i].IsInvisible = ctrl.String == ' '
+    end
+    function setup_cluster_id(c, ctrl, i)
+        update_visiblity_cluster_setup(i, ctrl.Value == 0)
+        local keys={'Cluster Name', 'Number of Presets', 'Number of Screens'}
+        if ctrl.Value > 0 then
+            local idx=find_matching_custer_id(ctrl.Value, i)
+            if idx > 0 then
+                local val2=find_missing_custer_id()
+                local temp=nil
+                for _, key in pairs(keys) do
+                    temp=Controls[key][idx].String
+                    Controls[key][idx].String=Controls[key][i].String
+                    Controls[key][i].String=temp
+                end
+                Controls['Cluster'][i].Legend=string.gsub(Controls['Cluster Name'][i].String, "\\n", "\n")
+                Controls['Cluster'][idx].Legend=string.gsub(Controls['Cluster Name'][idx].String, "\\n", "\n")
+                Controls['Cluster Id'][idx].Value=val2
+                update_visiblity_cluster_setup(idx, val2 == 0)
+            end
+        else
+            for _, key in pairs(keys) do
+                if Controls[key][i].String then Controls[key][i].String='' end
+                if Controls[key][i].Value then Controls[key][i].Value=0 end
+            end
+            Controls['Cluster'][i].IsInvisible=true
+        end
+    end
+    function setup_cluster_screens(c, i, cluster_id, num_presets)
+        local num_screens=get_floor_ctrl(c)
+        if num_presets == 0 and num_screens > 0 and num_screens < 9 then
+            local width, height, pw=SCREEN_SIZES[num_screens][1], SCREEN_SIZES[num_screens][2], SCREEN_SIZES[num_screens][3]
+            DB[cluster_id][DB_W] = width
+            DB[cluster_id][DB_H] = height
+            local dx, dy=get_diff(width, height)
+            local data={[DB_X]=dx, [DB_Y]=dy, [DB_W]=pw, [DB_PSTNM]=SCREEN_LAYOUTS[num_screens]}
+            for ri, r in pairs(QCK_REGIONS[SCREEN_LAYOUTS[num_screens]]) do
+                data[DB_RGN + ri]={ [DB_X]=math.floor((r[DB_X] * width) + 0.5),
+                    [DB_Y]=math.floor((r[DB_Y] * height) + 0.5),
+                    [DB_W]=math.floor((r[DB_W] * width) + 0.5),
+                    [DB_H]=math.floor((r[DB_H] * height) + 0.5),
+                    [DB_SRC]=ri}
+            end
+            db_set(cluster_id, DB_PRST, data)
+        elseif DB[DB_PRST] then db_set(cluster_id, DB_PRST, nil) end
+        local linked = cluster_linked(cluster_id)
+        if cluster_id%2==1 and linked then
+            local np = cluster_ctrl('Number of Presets', cluster_id+1).Value
+            local screens=cluster_ctrl('Number of Screens', cluster_id+1)
+            if math.floor(screens.Value) ~= num_screens then screens.Value=num_screens
+            setup_cluster_screens(screens, i, cluster_id+1, np) end
+        elseif cluster_id%2==0 and linked then
+            local np = cluster_ctrl('Number of Presets', cluster_id-1).Value
+            local screens=cluster_ctrl('Number of Screens', cluster_id-1)
+            if math.floor(screens.Value) ~= num_screens then screens.Value=num_screens
+            setup_cluster_screens(screens, i, cluster_id-1, np) end
+        end
+    end
+    function setup_cluster_presets(c, cluster_id)
+        for d, _ in pairs(DB[cluster_id]) do
+            if type(d) == 'number' and d > DB_PRST + c.Value then DB[cluster_id][d]=nil end
+        end
+        DB[cluster_id][DB_PRST] = {[DB_X]=0, [DB_Y]=0, [DB_W]=28, [DB_PSTNM]='Off Preset'}
+        Controls['Cluster DB'][cluster_id].String=tbl_dump(DB[cluster_id])
+    end
+    function setup_cluster_name()
+        CLSTR_NAME={}
+        for idx, ctrl in spairs(Controls['Cluster Id'], function(t,a,b) return t[b].Value~=nil and t[a].Value~=nil and t[b].Value > t[a].Value end) do
+            if ctrl.Value > 0 then
+                local name=Controls['Cluster Name'][idx].String
+                if name == '' then name='Cluster '..get_floor_ctrl(ctrl) end
+                Controls['Cluster'][idx].Legend=string.gsub(name, "\\n", "\n")
+                name = string.gsub(name, "\\n", " ")
+                table.insert(CLSTR_NAME, name)
+                CLUSTERS_ID[name]=ctrl.Value
+            end
+        end
+        Controls['Select Cluster'].Choices=CLSTR_NAME
+    end
+    function designer_init()
+        -- Videowalls
+        Controls['Editing Cluster'].Value=0
+        Controls['Editing Preset'].Value=0
+        for _, s in pairs({'Select Cluster', 'Select Preset', 'Panels Height', 'Panels Width', 'Preset Quick Regions', 'Preset Pretty'}) do
+            Controls[s].String=''
+        end
+        Controls['Preset Quick Regions'].Choices=QCK_PRESETS
+        Controls['Preset Quick Regions'].EventHandler=videowall_quick_regions
+        Controls['Panels Width'].EventHandler=function(c) db_set(Controls['Editing Cluster'].Value, DB_W, math.floor(c.Value)) redraw_preview() end
+        Controls['Panels Height'].EventHandler=function(c) db_set(Controls['Editing Cluster'].Value, DB_H, math.floor(c.Value)) redraw_preview() end
+        Controls['Select Cluster'].EventHandler=videowall_select_cluster
+        Controls['Select Preset'].EventHandler=videowall_select_preset
+        Controls['Panel Divisions'].Choices={'28 Divisions (7,4,2)', '30 Divisions (6,5,3,2)'}
+        Controls['Panel Divisions'].EventHandler=save_preset_to_db
+        Controls['Preset Pretty'].EventHandler=save_preset_to_db
+        Controls['Videowall Source Offset'].EventHandler=save_preset_to_db
+        Controls['Videowall Layer Offset'].EventHandler=save_preset_to_db
+
+        for i, ctrl in pairs(Controls['Source Pretty']) do ctrl.EventHandler=function() save_source_pretty_to_db(i, ctrl) end end
+        -- Videowall -> Preset: Region X, Y, Width, Height, Source, Default
+        for pi, p in pairs({'X', 'Y', 'Width', 'Height', 'Source', 'Default'}) do
+            for r=1, REGIONS do
+                if pi < DB_SRC then
+                    Controls['Region '..p][r].EventHandler=function() redraw_preview() save_preset_to_db() end
+                elseif pi == DB_SRC then Controls['Region '..p][r].EventHandler=videowall_select_source
+                else Controls['Region '..p][r].EventHandler=save_preset_to_db
+        end end end
+
+        -- Setup -> Cluster: Id, Name, Presets, Screensk
+        local next_idx=find_missing_custer_id()
+        for i, ctrl in pairs(Controls['Cluster Id']) do
+            if ctrl.Value == 0 and next_idx > 0 and next_idx <= CLUSTERS then
+                if CLUSTERS>8 or (CLUSTERS<5 and i>4 and (i%4)>1) or (CLUSTERS>4 and (i-4)>0) then
+                    ctrl.Value=next_idx
+                    next_idx=find_missing_custer_id()
+            end end
+            local cluster_id=get_floor_ctrl(ctrl)
+            update_visiblity_cluster_setup(i, cluster_id == 0)
+            if cluster_id > 0 and not DB[cluster_id] then db_set(cluster_id, DB_ID, cluster_id) end
+            ctrl.EventHandler=function(c) setup_cluster_id(c, ctrl, i) end
+            Controls['Cluster Name'][i].EventHandler=setup_cluster_name
+            Controls['Number of Screens'][i].EventHandler=function(c) 
+                setup_cluster_screens(c, i, cluster_id, Controls['Number of Presets'][i].Value) 
+                recalculate_offsets() end
+            Controls['Number of Presets'][i].EventHandler=function(c) setup_cluster_presets(c, i, cluster_id) end
+        end setup_cluster_name()
+
+        -- Setup -> Macro: Class, Channel
+        for i, ctrl in pairs(Controls['Macro Class']) do
+            if i <= 16 then ctrl.Choices=FTA_CLS else ctrl.Choices=MOD_CLS end
+            if ctrl.String=='' then
+                if DEFAULT_CLS[i] then
+                    ctrl.String=DEFAULT_CLS[i]
+                    Controls['Macro Channel'][i].String=''..DEFAULT_CHN[DEFAULT_CLS[i]]
+                else ctrl.String=' ' end
+            end
+            ctrl.EventHandler=function(c) setup_macros(c, i) end
+            SCREEN_MAPS[i] = tonumber(Controls['Macro Channel'][i].String)
+        end
+        recalculate_offsets()
+    end designer_init()
+    -- ############################ --
+    -- Methods only used in runtime --
+    -- ############################ --
+    function current_cluster_floored(name)
+        local cluster_tp=math.floor(Controls['Current Cluster'].Value)
+        if name == 'Cluster Name' then return Controls[name][cluster_tp].String
+        else return math.floor(Controls[name][cluster_tp].Value)
+    end end
+    function feedback(ctrls, i)
+        for o, ctrl in pairs(ctrls) do
+            ctrl.Value=(o == i)
+        end
+    end
+    function cluster_on_off(on_state, cluster_id)
+        if cluster_id == nil then cluster_id=current_cluster_floored('Cluster Id') end
+        dbg(DG_FN, 'cluster_on_off '..cluster_id)
+        if cluster_ctrl('Number of Presets', cluster_id).Value > 0 then
+            if on_state then
+                local preset_id=math.floor(math.abs(Controls['Active Preset'][cluster_id].Value))
+                select_preset(preset_id, cluster_id)
+            else select_preset(0, cluster_id) end
+        else
+            local num_screens=cluster_ctrl('Number of Screens', cluster_id).Value
+            local offset=DB[cluster_id][DB_OFFST] or 0
+            local cmd='control='
+            if on_state then cmd=cmd..'ON' else cmd=cmd..'OFF' end
+            for i=1, num_screens do
+                queue_add(QUEUE[QUE_STB], {offset + i, cmd})
+            end
+        end
+    end
+    function toggle_tv_view()
+        local interface=Controls['Current Navigation'].Value
+        if interface == INT_MACRO then show_interface(INT_CTRLS)
+        elseif interface == INT_CTRLS then show_interface(INT_MACRO) 
+        else show_interface(INT_CLUSTER) end
+    end
+    function screen_space_math(i) -- 840 x 324
+        local cluster_id=current_cluster_floored('Cluster Id')
+        local num_presets=current_cluster_floored('Number of Presets')
+        local num_screens=current_cluster_floored('Number of Screens')
+        local preset_id=math.abs(get_floor_ctrl(Controls['Active Preset'][cluster_id]))
+        local width, height=DB[cluster_id][DB_W], DB[cluster_id][DB_H]
+        local regions=DB[cluster_id][DB_PRST+preset_id]
+        if not width then width=SCREEN_SIZES[num_screens][1] end
+        if not height then height=SCREEN_SIZES[num_screens][2] end
+        -- dbg(DG_FN, 'screen_space_math', i, ' num presets', ' ', num_presets, ' preset id', ' ', preset_id, ' width', ' ', width, ' height', ' ', height, ' offset', ' ',offset)
+        if regions then
+            local dx, dy, rw=regions[DB_X], regions[DB_Y], regions[DB_W]
+            local bx, by=(i % rw) + 0.5, math.floor(i / rw) + 0.5
+            -- local_coord(coord, seg, size, delta)
+            local pos_x, pos_y=local_coord(bx, rw, width, dx), local_coord(by, 12, height, dy)
+            -- local pos_x, pos_y=local_v2(bx, by, rw, dx, dy, width, height)
+            dbg(DG_FN, 'dx '..dx..' dy '..dy..' bx '..bx..' by '..by)
+            for i, r in pairs(regions) do
+                if i >= DB_RGN and type(r) == 'table' and r[DB_X] <= pos_x and pos_x <= r[DB_X] + r[DB_W] and r[DB_Y] <= pos_y and pos_y <= r[DB_Y] + r[DB_H] then
+                    local src=r[DB_OVR] or r[DB_SRC]
+                    if src < 1 then src = math.abs(r[DB_SRC] or i-DB_RGN) end
+                    dbg(DG_FN, 'x '..pos_x..' y '..pos_y..'\nregion '..(i-DB_RGN)..' src '..(src or 'nil'))
+                    select_panel_region(i - DB_RGN, src)
+            end end
+        end
+    end
+    function select_panel_region(i, s)
+        Controls['Current Panel'].Value=i
+        if s and s > 0 then
+            show_interface(INT_MACRO)
+        else show_interface(INT_VW_SRC) end
+    end
+    function select_source(i)
+        local interface=math.floor(Controls['Current Navigation'].Value)
+        local source=math.floor(Controls['Current Source'].Value)
+        if source ~= i or interface ~= INT_FOX then
+            local chn=math.floor(Controls['Active FoxChn'][i].Value)
+            Controls['Current Source'].Value=i
+            set_legends('Foxtel '..i)
+            feedback(Controls['Foxtel'], i)
+            feedback(Controls['Fox Macro'], chn)
+        end
+        if interface ~= INT_FOX then show_interface(INT_FOX) end
+    end
+    function select_cluster(i)
+        Controls['Current Cluster'].Value=i
+        if Controls['Number of Screens'][i].Value == 1 then
+            Controls['Current Panel'].Value=1
+            show_interface(INT_MACRO)
+        else show_interface(INT_CLUSTER) end
+    end
+    function override_region(i, r, vwo, lyro)
+        if i then
+            local cluster_id = current_cluster_floored('Cluster Id')
+            local preset_id = math.abs(Controls['Active Preset'][cluster_id].Value)
+            local region = r or Controls['Current Panel'].Value
+            local data = DB[cluster_id][DB_PRST + preset_id][DB_RGN + region]
+            dbg(DG_FN, 'override_region '..(data[DB_OVR]or'nil')..' '..(data[DB_SRC]or'nil')..' i: '..i..' region: '..region..' vwo: '..(vwo or 'nil')..' lyro: '..(lyro or 'nil'))
+            if i == 0 then
+                data[DB_OVR] = nil
+                i = data[DB_SRC] or region
+                if i < 1 then i = math.abs(i) end
+            else data[DB_OVR] = i end
+            if Properties['Override Layout'].Value then
+                if cluster_linked(cluster_id) then
+                    local dir = Properties['Link Clusters Direction'].Value
+                    local odd, even = (cluster_id - (1 - cluster_id%2)), (cluster_id + cluster_id%2)
+                    local o_vwo, e_vwo = DB[odd][DB_VWO], DB[even][DB_VWO]
+                    local o_lyro, e_lyro = DB[odd][DB_LYRO], DB[even][DB_LYRO]
+                    local o_w, o_h, e_w, e_h = DB[odd][DB_W], DB[odd][DB_H], DB[even][DB_W], DB[even][DB_H]
+                    local o_preset, e_preset = math.max(0, Controls['Active Preset'][odd].Value), math.max(0, Controls['Active Preset'][even].Value)
+                    local o_data, e_data = DB[odd][DB_PRST + o_preset], DB[even][DB_PRST + e_preset]
+                    local cmd = 'panel='..cluster_to_panel_id(odd)..', layout={'
+                    cmd = presets_to_cmd(cmd, o_preset, o_data, o_w, o_h, o_vwo, o_lyro, e_preset, e_data, e_w, e_h, e_vwo, e_lyro, dir)
+                    queue_add(QUEUE[QUE_CLUSTER], cmd)
+                else
+                    local width, height = DB[cluster_id][DB_W], DB[cluster_id][DB_H]
+                    vwo=vwo or DB[cluster_id][DB_VWO] or 0
+                    lyro=lyro or DB[cluster_id][DB_LYRO] or 0
+                    local presets=DB[cluster_id][DB_PRST + preset_id]
+                    local cmd='panel='..cluster_id..', layout={'
+                    cmd = preset_to_cmd(cmd, preset_id, presets, width, height, vwo, lyro)
+                    queue_add(QUEUE[QUE_CLUSTER], cmd)
+                end
+            else
+                vwo=vwo or DB[cluster_id][DB_VWO] or 0
+                lyro=lyro or DB[cluster_id][DB_LYRO] or 0
+                dbg(DG_FN, 'override_region region: '..region..' i: '..i..' vwo: '..vwo..' '..data[DB_SRC])
+                queue_add(QUEUE[QUE_CLUSTER], 'panel='..cluster_id..', layer='..math.floor(region+lyro-1)..', source='..(i+vwo-1))
+            end
+            show_interface(INT_MACRO)
+        else show_interface(INT_CLUSTER) end
+    end
+    function compare_screens(cluster_a, preset_a, cluster_b, preset_b)
+        if cluster_a == 0 or cluster_b == 0 or cluster_a == cluster_b then return false end
+        local screens = {}
+        
+        local data_a=DB[cluster_a][DB_PRST+preset_a]
+        if data_a then
+            for r=1, REGIONS do
+                if data_a[r+DB_RGN] and data_a[r+DB_RGN][DB_DEF] then
+                    local s = data_a[r+DB_RGN][DB_SRC] or r
+                    screens[s] = true
+                end
+            end
+        else return false end
+
+        local data_b=DB[cluster_b][DB_PRST+preset_b]
+        if data_b then
+            for r=1, REGIONS do
+                if data_b[r+DB_RGN] and data_b[r+DB_RGN][DB_DEF] then
+                    local s = data_b[r+DB_RGN][DB_SRC] or r
+                    if screens[s] then return true end
+                end
+            end
+        else return false end
+    end
+    function select_preset(i, cluster_id)
+        if not cluster_id then cluster_id=current_cluster_floored('Cluster Id') end
+        local preset_id=i -- If preset is > 0 then ON command if not then save current as negative
+        local num_presets=cluster_ctrl('Number of Presets', cluster_id).Value
+        if preset_id > num_presets then return end
+        if preset_id > 0 then Controls['Active Preset'][cluster_id].Value=preset_id
+        else Controls['Active Preset'][cluster_id].Value=-math.abs(Controls['Active Preset'][cluster_id].Value) end
+
+        local data=DB[cluster_id][DB_PRST+i]
+        local offset=DB[cluster_id][DB_OFFST] or 0
+        if data then -- Load defaults for the preset
+            for r=1, REGIONS do
+                if data[r+DB_RGN] and data[r+DB_RGN][DB_DEF] then
+                    local s=data[r+DB_RGN][DB_SRC] or r
+                    local chn=tonumber(data[r+DB_RGN][DB_DEF])
+                    if chn then queue_add(QUEUE[QUE_STB], {offset + s, 'macro='..chn})
+                    else queue_add(QUEUE[QUE_STB], {offset + s, 'control='..data[r+DB_RGN][DB_DEF]}) end
+                end
+            end
+        end
+        local linked = cluster_linked(cluster_id)
+        if cluster_id % 2 == 1 and linked then
+            local preset2=math.max(0, Controls['Active Preset'][cluster_id+1].Value)
+            if compare_screens(cluster_id, i, cluster_id+1, preset2) then
+                Controls['Active Preset'][cluster_id+1].Value=1
+                preset2=1
+            end
+            preset_id=i + (preset2 * (num_presets + 1))
+        elseif cluster_id % 2 == 0 and linked then
+            local preset1=math.max(0, Controls['Active Preset'][cluster_id-1].Value)
+            if compare_screens(cluster_id-1, preset1, cluster_id, i) then
+                Controls['Active Preset'][cluster_id-1].Value=1
+                preset1=1
+            end
+            num_presets=cluster_ctrl('Number of Presets', cluster_id-1).Value + 1
+            preset_id=preset1 + (i * num_presets)
+        end -- Calculates the preset ID if flusters are linked
+        local cmd=string.format('panel=%d, preset=%d', cluster_to_panel_id(cluster_id), math.floor(preset_id))
+        queue_add(QUEUE[QUE_CLUSTER], cmd)
+        if Controls['Current Navigation'].Value == INT_PRESET then show_interface(INT_CLUSTER) end
+    end
+
+    function get_current_screen()
+        -- local cluster_id=Controls["Cluster Id"][Controls['Current Cluster'].Value].Value
+        local cluster_id = current_cluster_floored('Cluster Id')
+        local num_presets=current_cluster_floored('Number of Presets')
+        local offset = DB[cluster_id][DB_OFFST] or 0
+        if num_presets == 0 then return Controls['Current Panel'].Value + offset end
+        local preset = math.abs(Controls['Active Preset'][cluster_id].Value)
+        if preset == 0 then return 1 end
+        local region = Controls['Current Panel'].Value
+        local data = DB[cluster_id][DB_PRST + preset][DB_RGN + region]
+        local screen = data[DB_OVR] or data[DB_SRC] or region
+        if screen < 1 then screen = math.abs(data[DB_SRC] or region) end
+        return math.floor(screen + offset)
+    end
+    function common_vals()
+        local source=Controls['Current Source'].Value
+        local screen=get_current_screen()
+        local active, idx, macro, queue=nil, nil, nil, nil
+        if Controls['Current Navigation'].Value == INT_FOX then
+            active=Controls['Active FoxChn'][source]
+            idx=source
+            macro=Controls['Fox Macro']
+            queue=QUEUE[QUE_SOURCE]
+        else
+            active=Controls['Active StbChn'][screen]
+            idx=screen
+            macro=Controls['Stb Macro']
+            queue=QUEUE[QUE_STB]
+        end
+        return active, idx, macro, queue
+    end
+    function common_controls(name)
+        local interface=Controls['Current Navigation'].Value
+        if interface == INT_CLUSTER then
+            dbg(DG_RX, 'cluster_controls '..'control=' .. name)
+            cluster_on_off(name == 'ON')
+        else
+            local screen=get_current_screen()
+            local active, idx, macro, queue=common_vals()
+            dbg(DG_RX, 'source_controls '..idx..' control=' .. name)
+            queue_add(queue, {idx, 'control=' .. name})
+            if active and active.Value > 0 and (name == 'CH UP' or name == 'CH DN') then
+                active.Value=0
+                feedback(macro, 0)
+            end
+            if interface == INT_CTRLS then
+                if name=='HDMI 1' or name=='HDMI 2' or name=='HDMI 3' then
+                    Controls['Active StbChn'][screen].Value=-Controls['Active StbChn'][screen].Value
+                    feedback(Controls['Stb Macro'], 0)
+                elseif name=='DTV' then
+                    local chn=math.abs(Controls['Active StbChn'][screen].Value)
+                    Controls['Active StbChn'][screen].Value=chn
+                    feedback(Controls['Stb Macro'], chn)
+                    if SCREEN_MAPS[chn] then queue_add(QUEUE[QUE_STB], {screen, 'macro=' .. SCREEN_MAPS[chn]}) end
+    end end end end
+    function common_numbers(i)
+        local active, idx, macro, queue=common_vals()
+        if active.Value > 0 then
+            active.Value=0
+            feedback(macro, 0)
+        end
+        dbg(DG_RX, 'source_numbers '..idx..' button=' .. i)
+        queue_add(queue, {idx, 'button=' .. i})
+    end
+    function source_macros(i, source_id)
+        if source_id == nil then source_id=math.floor(Controls['Current Source'].Value) end
+        if FOXTEL_CLS[i] then
+            Controls['Active FoxChn'][source_id].Value=i
+            if not pcall(function() Controls['FoxChn'][source_id].CssClass='transparent '..FOXTEL_CLS[i] end) then 
+                Controls['FoxChn'][source_id].Legend = ''..FOXTELS_MAPS[i] 
+            else Controls['FoxChn'][source_id].Legend = '' end
+            dbg(DG_RX, 'source_macros '..source_id..' '..i)
+            feedback(Controls['Fox Macro'], i)
+            queue_add(QUEUE[QUE_SOURCE], {source_id, 'preset=' .. FOXTELS_MAPS[i]})
+        else 
+            dbg(DG_RX, 'source_macros '..source_id..' out of bounds: '..i)
+        end
+    end -- SOURCE FUNCTIONS (FOXTEL)
+    function screen_macros(i, screen)
+        if screen == nil then screen=get_current_screen() end
+        if Controls['Macro Channel'][i] then
+            Controls['Active StbChn'][screen].Value=i
+            local chn=tonumber(Controls['Macro Channel'][i].String)
+            dbg(DG_RX, 'screen_macros '..screen..' i: '..i..' chn: '..chn)
+            if chn then queue_add(QUEUE[QUE_STB], {screen, 'macro=' .. chn}) end
+            feedback(Controls['Stb Macro'], i)
+        else
+            dbg(DG_RX, 'db updated for '..screen..' chn: '..i)
+            if i then queue_add(QUEUE[QUE_STB], {screen, 'macro=' .. i}) end
+        end
+    end -- SCREEN FUNCTIONS
+    function screen_brightness(i)
+        for idx, ctrl in pairs(Controls['Videowall Brightness']) do
+            if idx == i then
+                local panel=cluster_to_panel_id(i)
+                queue_add(QUEUE[QUE_CLUSTER], 'panel='..panel..', brightness='..ctrl.Value)
+            end
+        end
+        BrightTimer:Stop()
+    end
+    function show_interface(index)
+        if index == nil then index=INT_CLUSTER end
+        if Controls['Current Navigation'].Value ~= index then
+            local vis={['HOME']=(index==INT_HOME and CLUSTERS>1), ['CLUSTER']=(index==INT_CLUSTER), ['CLUSTER28']=false, ['CLUSTER30']=false,
+                        ['PRESETS']=(index==INT_PRESET),['MACROS']=(index==INT_MACRO), ['CONTROLS']=(index==INT_CTRLS),
+                        ['FOXCTRL']=(index==INT_FOX), ['VWSOURCE']=(index==INT_VW_SRC), ['SETTINGS']=(index==INT_SETTINGS), ['NAVIGATION']=true}
+            dbg(DG_FN, 'SHOW SCREEN '..index)
+            dbg(DG_DG, tbl_dump(vis))
+            local cluster_id=current_cluster_floored('Cluster Id')
+            if cluster_id == 0 and CLUSTERS == 1 then cluster_id = 1
+                Controls['Current Cluster'].Value = find_matching_custer_id(1, 0)
+            end
+            local cluster_name=string.gsub(current_cluster_floored('Cluster Name'), "\\n", "\n")
+            local num_presets=current_cluster_floored('Number of Presets')
+            local hide=Properties['Hide off control'].Value
+            Controls['OFF'].IsInvisible=(index == INT_CTRLS and (hide == 'Always' or (hide == 'If Presets enabled' and num_presets > 0)))
+            if vis['HOME'] then set_legends('HOME')
+            elseif vis['SETTINGS'] then set_legends('SETTINGS')
+            elseif vis['VWSOURCE'] then
+                local panel = Controls['Current Panel'].Value
+                set_legends(cluster_name, 'Source for '..math.floor(panel))
+                local screen_id=get_current_screen()
+                local num_screens=current_cluster_floored('Number of Screens')
+                local offset = DB[cluster_id][DB_OFFST] or 0
+                local names = DB[cluster_id][DB_NAMES] or {}
+                if type(names) ~= 'table' then names={} end
+                for o, ctrl in pairs(Controls['Source']) do
+                    local pretty_name = names[o]
+                    ctrl.Value=(o == screen_id-offset)
+                    ctrl.Legend=pretty_name or 'Screen '..math.floor(o+offset)
+                    ctrl.IsInvisible=(o > num_screens)
+                end
+            elseif vis['MACROS'] or vis['CONTROLS'] then -- Screen channels / controls
+                local screen_id=get_current_screen()
+                Controls['VW SRC'].IsInvisible = num_presets <= 0
+                if screen_id == 0 then return show_interface(INT_HOME) end
+                local screen_name='Screen '..math.floor(screen_id)
+                local num_screens=current_cluster_floored('Number of Screens')
+                if num_screens < 2 then screen_name='TV' end
+                local names = DB[cluster_id][DB_NAMES] or {}
+                if type(names) ~= 'table' then names={} end
+                local pretty_name = names[screen_id]
+                if index == INT_MACRO then -- screen channels
+                    local chn_db = Controls['Active StbChn'][screen_id]
+                    if not chn_db then
+                        set_legends('ERROR: stb '..screen_id, 'exceeds total STBs') 
+                        print('ERROR: stb/screen '..screen_id..' exceeds total Screen + STBs, stop the design and add more to the properties of this component')
+                    end
+                    if Controls['Active StbChn'][screen_id] then feedback(Controls['Stb Macro'], Controls['Active StbChn'][screen_id].Value) end
+                end
+                set_legends(cluster_name, pretty_name or screen_name)
+            elseif vis['PRESETS'] then -- CHANGE PRESET
+                local width, height=DB[cluster_id][DB_W], DB[cluster_id][DB_H]
+                for i=1, 6 do
+                    local data=DB[cluster_id][DB_PRST+i]
+                    Controls['Preset'][i].IsInvisible=data==nil
+                    if data then
+                        local svg=quick_draw_regions(width, height, data, false)
+                        draw_svg(Controls['Preset'][i], svg)
+                    end
+                end
+                set_legends(cluster_name, 'Presets')
+            elseif not vis['FOXCTRL'] then-- Screen selection -- if index == INT_CLUSTER -- will fallback
+                -- dbg(DG_FN, 'cluster '..cluster_id..' DB '..tbl_dump(DB[cluster_id]))
+                local preset_id=math.abs(get_floor_ctrl(Controls['Active Preset'][cluster_id]))
+                local regions=DB[cluster_id][DB_PRST+preset_id] or {}
+                local width, height=(DB[cluster_id][DB_W] or 2048), (DB[cluster_id][DB_H] or 576)
+                -- dbg(DG_FN, 'preset '..preset_id..' width '..width..' height '..height..' regions '..tbl_dump(regions))
+                draw_svg(Controls['Render Panel'], quick_draw_regions(width, height, regions, false))
+                vis['CLUSTER30']=regions[DB_W] == 30
+                vis['CLUSTER28']=regions[DB_W] ~= 30
+                vis['CLUSTER']=true
+                Controls['PRSTS'].IsInvisible=num_presets < 2
+                set_legends(cluster_name)
+            end
+            set_layers_instant(vis)
+            Controls['Current Navigation'].Value=index
+        end
+    end -- BIG METHOD OF LAYER STATES
+    function region_to_cmd(id, offset_x, offset_y, width, height, region, vwo)
+        local pad_x, pad_y=0, 0
+        local edges, padding=Properties['Edges Pixel Padding'].Value, Properties['Regions Pixel Padding'].Value
+        if edges > 0 then
+            if region[DB_X] == 0 then 
+                offset_x = offset_x + edges
+                pad_x = pad_x + edges
+            end
+            if region[DB_Y] == 0 then 
+                offset_y = offset_y + edges
+                pad_y = pad_y + edges
+            end
+            if (region[DB_X] + region[DB_W]) >= width then pad_x = pad_x + edges end
+            if (region[DB_Y] + region[DB_H]) >= height then pad_y = pad_y + edges end
+        end
+        if padding > 0 then
+            offset_x = offset_x + padding
+            offset_y = offset_y + padding
+            pad_x = pad_x + (padding * 2)
+            pad_y = pad_y + (padding * 2)
+        end
+        local source = math.max(0, (region[DB_OVR] or region[DB_SRC] or id) + (vwo or 0))
+        if source <= 0 then return '' end
+        return '['..(id)..']='..tbl_dump({
+            [DB_X]=region[DB_X] + offset_x,
+            [DB_Y]=region[DB_Y] + offset_y,
+            [DB_W]=region[DB_W] - pad_x,
+            [DB_H]=region[DB_H] - pad_y,
+            [DB_SRC]=source
+        })..','
+    end
+    function preset_to_cmd(cmd, preset_i, data, width, height, vwo, lyro)
+        if data ~= nil and preset_i > 0 then
+            for r_i, region in pairs(data) do
+                if r_i > DB_RGN then
+                    cmd=cmd..region_to_cmd(r_i-DB_RGN+lyro, 0, 0, width, height, region, vwo)
+                end
+            end
+            return string.gsub(cmd, ',$', '}')
+        else return string.gsub(cmd, '{$', '{}') end
+    end
+    function presets_to_cmd(cmd, o_preset, o_data, o_w, o_h, o_vwo, o_lyro, e_preset, e_data, e_w, e_h, e_vwo, e_lyro, dir)
+        local offset_r=0
+        if o_data ~= nil and o_preset > 0 then
+            for o_r, o_region in pairs(o_data) do
+                if o_r > DB_RGN and type(data) == 'table' then
+                    if dir == 'Even then Odd' then
+                        cmd=cmd..region_to_cmd(o_r-DB_RGN+o_lyro, e_w, 0, o_w, o_h, o_region, o_vwo)
+                    elseif dir == 'Even above Odd' then
+                        cmd=cmd..region_to_cmd(o_r-DB_RGN+o_lyro, 0, e_h, o_w, o_h, o_region, o_vwo)
+                    else
+                        cmd=cmd..region_to_cmd(o_r-DB_RGN+o_lyro, 0, 0, o_w, o_h, o_region, o_vwo)
+                    end
+                    offset_r = offset_r + 1
+                end
+            end
+        end
+        if e_data ~= nil and e_preset > 0 then
+            for e_r, e_region in pairs(e_data) do
+                if e_r > DB_RGN and type(data) == 'table' then
+                    if dir == 'Odd then Even' then
+                        cmd=cmd..region_to_cmd(offset_r+e_r-DB_RGN+e_lyro, o_w, 0, e_w, e_h, e_region, e_vwo)
+                    elseif dir == 'Odd above Even' then
+                        cmd=cmd..region_to_cmd(offset_r+e_r-DB_RGN+e_lyro, 0, o_h, e_w, e_h, e_region, e_vwo)
+                    else
+                        cmd=cmd..region_to_cmd(offset_r+e_r-DB_RGN+e_lyro, 0, 0, e_w, e_h, e_region, e_vwo)
+                    end
+                end
+            end
+        else cmd=string.gsub(cmd, '{$', '{}') end
+        return string.gsub(cmd, ',$', '}')
+    end
+    function run_regions_setup(i)
+        local num_presets=cluster_ctrl('Number of Presets', i).Value
+        local num_screens=cluster_ctrl('Number of Screens', i).Value
+        local cluster_name = cluster_ctrl('Cluster Name', i).String
+        local dir = Properties['Link Clusters Direction'].Value
+        local linked = cluster_linked(i)
+        cluster_name = string.gsub(cluster_name, "\\n", " ")
+        local o_vwo=DB[i][DB_VWO]
+        local o_lyro=DB[i][DB_LYRO]
+        if num_presets > 0 and DB[i] then
+            queue_add(QUEUE[QUE_CLUSTER], 'panel='..i..', clear_presets='..math.floor(num_presets))
+            if linked and i % 2 == 1 and DB[i+1]then
+                local o_w, o_h = DB[i][DB_W], DB[i][DB_H]
+                local e_w, e_h = DB[i+1][DB_W], DB[i+1][DB_H]
+                local num_presets2 = cluster_ctrl('Number of Presets', i+1).Value
+                local e_vwo=DB[i+1][DB_VWO]
+                local e_lyro=DB[i+1][DB_LYRO]
+                for e_i=0, num_presets2 do
+                    local e_p = DB[i + 1][DB_PRST + e_i]
+                    for o_i=0, num_presets do
+                        local o_p = DB[i][DB_PRST + o_i]
+                        local id = math.floor(o_i + (e_i * (num_presets + 1)))
+                        local name = id..': '
+                        if id < 10 then name = '0'..name end
+                        if o_i == 0 then name = name..'off ' else name = name..(o_p[DB_PSTNM] or o_i)..' ' end
+                        if e_i == 0 then name = name..'off' else name = name..(e_p[DB_PSTNM] or e_i) end
+                        local cmd='panel='..cluster_to_panel_id(i)..', setup='..id..', name='..name..', regions={'
+                        -- cmd=presets_to_cmd(cmd, o_i, o_p, width, height, o_vwo, e_i, e_p, width2, height2, e_vwo, dir)
+                        cmd=presets_to_cmd(cmd, o_preset, o_data, o_w, o_h, o_vwo, o_lyro, e_preset, e_data, e_w, e_h, e_vwo, e_lyro, dir)
+                        queue_add(QUEUE[QUE_CLUSTER], cmd)
+                end end
+            elseif not linked then
+                local width, height = DB[i][DB_W], DB[i][DB_H]
+                for o_i=0, num_presets do
+                    local o_p = DB[i][DB_PRST + o_i]
+                    local name = 'Preset '
+                    if o_i == 0 then name = name..'off' else name = name..o_i end
+                    if o_p[DB_PSTNM] then name = o_p[DB_PSTNM] end
+                    local cmd='panel='..i..', setup='..o_i..', name='..name..', regions={'
+                    cmd=preset_to_cmd(cmd, o_i, o_p, o_w, O_h, o_vwo, o_lyro)
+                    queue_add(QUEUE[QUE_CLUSTER], cmd)
+                end 
+            end
+        end
+        local offset=DB[i][DB_OFFST] or 0
+        if (linked and i % 2 == 1) or not linked then
+            local ip = check_ip(Controls['Starting IP'].String)
+            for s=1, num_screens do
+                local screen_name = cluster_name..' '..s
+                local names = DB[i][DB_NAMES] or {}
+                if type(names) ~= 'table' then names={} end
+                local pretty_name = names[s]
+                local ip_part = ''
+                if ip then ip_part = string.format(', ip=%d.%d.%d.%d', ip[1], ip[2], ip[3], math.min(ip[4]+s+offset, 255)) end
+                if num_screens < 2 then screen_name = cluster_name..' TV' end
+                queue_add(QUEUE[QUE_STB], {s+offset, 'name='..(pretty_name or screen_name)}) 
+            end
+        end
+    end
+    function parse_commands(ctrl)
+        dbg(DG_RX, 'parse_commands '..ctrl.String)
+        if ctrl.String ~= '' and ctrl.String ~= ' ' then
+            local clusters=Properties['Number of Clusters'].Value
+            local screens=Properties['Number of TVs'].Value + Properties['Number of STB'].Value
+            if ctrl.String == 'Start of Day' then                                 -- Start of Day command
+                for i=1, clusters do cluster_on_off(true, i) end
+            elseif ctrl.String == 'End of Day' then                               -- End of Day command
+                for i=1, clusters do cluster_on_off(false, i) end
+            elseif ctrl.String == 'Random Channels' then                          -- Random channels command
+                for s, _ in pairs(Controls['Screen CMD']) do
+                    local chn=Controls['Macro Channel'][s].String
+                    while chn == '' or chn == ' ' do
+                        chn=Controls['Macro Channel'][math.random(32)].String
+                    end
+                    Controls['Active StbChn'][s].Value=tonumber(chn)
+                    queue_add(QUEUE[QUE_STB], {s, 'macro='..chn})
+                end
+            elseif ctrl.String == 'Setup' then                                    -- Setup command
+                for i=1, clusters do
+                    run_regions_setup(i)
+                end
+            elseif string.find(ctrl.String, '[Ss]etup=') then                     -- Setup for specific cluster
+                local cluster=tonumber(strip_val('[Ss]etup=%d+', ctrl.String, 6))
+                run_regions_setup(cluster)
+            elseif string.find(ctrl.String, '[Ss]creen=0') or string.find(ctrl.String, '[Ss]creen=%d+-%d+') then
+                local start, finish = example:match("[Ss]creen=(%d+)-(%d+)")
+                if start and finish then start, finish = tonumber(start), tonumber(finish) end
+                if string.find(ctrl.String, 'RESCAN') then
+                    for s, _ in pairs(Controls['Screen CMD']) do
+                        for _, cmd in pairs(CTRL_LIST_RESCAN) do
+                            if start ~= nil and finish ~= nil then
+                                if s >= start and s <= finish then queue_add(QUEUE[QUE_STB], {s, cmd}) end
+                            else queue_add(QUEUE[QUE_STB], {s, cmd}) end
+                        end
+                    end
+                else
+                    for s, _ in pairs(Controls['Screen CMD']) do
+                        if start ~= nil and finish ~= nil then
+                            if s >= start and s <= finish then queue_add(QUEUE[QUE_STB], {s, ctrl.String}) end
+                        else queue_add(QUEUE[QUE_STB], {s, ctrl.String}) end
+                    end
+                end
+            elseif string.find(ctrl.String, '[Ss]creen=') then                    -- Command for specific screen
+                local screen=tonumber(strip_val('[Ss]creen=%d+', ctrl.String, 7))
+                if string.find(ctrl.String, 'RESCAN') then
+                    for _, cmd in pairs(CTRL_LIST_RESCAN) do
+                        queue_add(QUEUE[QUE_STB], {screen, cmd})
+                    end
+                else
+                    queue_add(QUEUE[QUE_STB], {screen, ctrl.String})
+                end
+            elseif string.find(ctrl.String, '[Cc]luster=0') or string.find(ctrl.String, '[Cc]luster=%d+-%d+') then
+                local start, finish = example:match("[Cc]luster=(%d+)-(%d+)")
+                if start and finish then start, finish = tonumber(start), tonumber(finish) end
+                if string.find(ctrl.String, '[Pp]reset=') then
+                    local preset=tonumber(strip_val('[Pp]reset=%d+', ctrl.String, 7))
+                    for c=1, clusters do
+                        if start ~= nil and finish ~= nil then
+                            if c >= start and c <= finish then select_preset(preset, c) end
+                        else select_preset(preset, c) end
+                    end
+                else
+                    for c=1, clusters do
+                        local panel=cluster_to_panel_id(c)
+                        if start ~= nil and finish ~= nil then
+                            if c >= start and c <= finish then queue_add(QUEUE[QUE_CLUSTER], 'panel='..panel..ctrl.String) end
+                        else queue_add(QUEUE[QUE_CLUSTER], 'panel='..panel..ctrl.String) end
+                    end
+                end
+            elseif string.find(ctrl.String, '[Cc]luster=') then                   -- Command for specific cluster
+                local cluster=tonumber(strip_val('[Cc]luster=%d+', ctrl.String, 8))
+                if string.find(ctrl.String, '[Pp]reset=') then
+                    local preset=tonumber(strip_val('[Pp]reset=%d+', ctrl.String, 7))
+                    if preset==0 then preset=Controls['Active Preset'][cluster].Value end
+                    select_preset(preset, cluster)
+                elseif string.find(ctrl.String, '[Ll]ayer=') then
+                    local region=tonumber(strip_val('[Ll]ayer=[^,]+', ctrl.String, 6))
+                    if region==nil then region=tonumber(strip_val('[Ll]ayer=%-[^,]+', ctrl.String, 7)) end
+                    dbg(DG_RX, 'cluster='..cluster..' layer='..(region or 'nil'))
+                    if type(region) ~= 'number' then region = 0 end
+                    if string.find(ctrl.String, '[Ll]ayer=%-') then region = math.abs(region)*-1 end
+                    dbg(DG_RX, 'cluster='..cluster..' layer='..region)
+                    local vwo, lyro = nil, nil
+                    if string.find(ctrl.String, '[Vv]wo=') then vwo = tonumber(strip_val('[Vv]wo=[^,]+', ctrl.String, 4)) end
+                    if string.find(ctrl.String, '[Ll]yro=') then lyro = tonumber(strip_val('[Ll]yro=[^,]+', ctrl.String, 5)) end
+                    override_region(region, nil, vwo, lyro)
+                else
+                    local panel=cluster_to_panel_id(cluster)
+                    queue_add(QUEUE[QUE_CLUSTER], 'panel='..panel..ctrl.String)
+                end
+            elseif string.find(ctrl.String, '[Ss]ource=0') then                   -- Command for all sources (foxtel)
+                for s=1, Properties['Number of Foxtel Boxes'].Value do
+                    queue_add(QUEUE[QUE_SOURCE], {s, ctrl.String})
+                end
+            elseif string.find(ctrl.String, '[Ss]ource=') then                    -- Command for specific source (foxtel)
+                local s=tonumber(strip_val('[Ss]ource=%d+', ctrl.String, 7))
+                queue_add(QUEUE[QUE_SOURCE], {s, ctrl.String})
+            end
+            if Properties['Clear Cmd Input'].Value then -- If clear input is enabled wait 10secs then clear input
+                Timer.CallAfter(function() ctrl.String=' ' end, 10)
+            end
+        end
+    end
+
+    function runtime_init()
+        QueueTimer=nil -- QUEUE INIT STUFF
+        BrightTimer=Timer.New()
+        QUEUE={{},{},{}}
+        QUE_CLUSTER, QUE_STB, QUE_SOURCE=1,2,3
+        for q in pairs(QUEUE) do QUEUE[q].start=queue_start QUEUE[q].stop=queue_stop end
+        -- INTERFACE VARS
+        -- Controls['Home'].CssClass='transparent bc_home'
+        -- Controls['Base 1'].CssClass='transparent bc_odd'
+        -- Controls['Base 2'].CssClass='transparent bc_even'
+        Controls['Home'].EventHandler=function() show_interface(INT_HOME) end
+        Controls['Label 1'].EventHandler=function() if Controls['Current Navigation'].Value > INT_CLUSTER then 
+            if current_cluster_floored('Number of Screens') < 2 then show_interface(INT_HOME) 
+            else show_interface(INT_CLUSTER) end end end
+        Controls['Label 2'].EventHandler=function() if Controls['Current Navigation'].Value > INT_CLUSTER then toggle_tv_view() end end
+        Controls['PRSTS'].EventHandler=function() show_interface(INT_PRESET) end
+        Controls['STTNGS'].EventHandler=function() if not Properties['Disable Settings'].Value then show_interface(INT_SETTINGS) end end
+        Controls['VW SRC'].EventHandler=function() show_interface(INT_VW_SRC) end
+        Controls['MCRS'].EventHandler=toggle_tv_view
+        Controls['CTRLS'].EventHandler=toggle_tv_view
+        Controls['Input CMD'].EventHandler=parse_commands
+
+        -- Controls['Settings'].EventHandler=function() show_interface(INT_SETTINGS) end
+
+        for i, c in pairs(Controls['ScreenTile']) do c.EventHandler=function() screen_space_math(i-1) end end -- TODO: REMOVE
+        for i=1, 6 do -- Foxtel setup
+            local hidden=FOXTELS < i
+            Controls['FoxChn'][i].IsInvisible=hidden
+            Controls['Foxtel'][i].IsInvisible=hidden
+            Controls['Foxtel'][i].Legend='  ' .. i
+            Controls['Foxtel'][i].EventHandler=function() select_source(i) end
+            Controls['FoxChn'][i].EventHandler=function() select_source(i) end
+        end
+        local next_vw=1
+        local screens = {}
+        for i=1, 16 do -- Cluster setup
+            local cluster_id = math.floor(Controls['Cluster Id'][i].Value)
+            Controls['Cluster'][i].IsInvisible= cluster_id==0
+            Controls['Cluster'][i].EventHandler=function(c) select_cluster(i) end
+            if cluster_id > 0 then
+                local name, screenname=Controls['Cluster Name'][i].String, ' Screen '
+                Controls['Cluster'][i].Legend=string.gsub(name, "\\n", "\n")
+                local offset=DB[cluster_id][DB_OFFST] or 0
+                if Controls['Number of Presets'][i].Value > 0 then
+                    Controls['Videowall Label'][next_vw].Legend=string.gsub(name, "\\n", " ")
+                    next_vw=next_vw + 1
+                    screenname=' Stb '
+                end
+                if name=='' or name==' ' then name='Cluster '..cluster_id end
+                if not (cluster_id%2 == 0 and cluster_linked(cluster_id)) then
+                    for s=1, Controls['Number of Screens'][i].Value do
+                        table.insert(screens, name..screenname..math.floor(offset+s))
+                        SCREENS_ID[name..screenname..math.floor(offset+s)]=offset + s
+                    end
+                end
+            end
+        end
+        Controls['Tune Stb'].Choices=screens
+        Controls['Tune Stb'].String='Tune Stb/Screen'
+        Controls['Tune Stb'].EventHandler=function(c)
+            local screen = SCREENS_ID[Controls['Tune Stb'].String] 
+            for _, cmd in pairs(CTRL_LIST_RESCAN) do
+                queue_add(QUEUE[QUE_STB], {screen, cmd})
+            end
+            c.String = 'Tune Stb/Screen'
+        end
+
+
+        for i=next_vw, 6 do Controls['Videowall Brightness'][i].IsInvisible=true end
+        for _, name in pairs(CTRL_MAP) do -- Navigation setup
+            Controls[name].EventHandler=function() common_controls(name) end
+        end
+        for i=0, 9 do -- Number setup
+            Controls['Number '..i].EventHandler=function() common_numbers(i) end
+        end
+        for i, ctrl in pairs(Controls['Source']) do ctrl.EventHandler=function() override_region(i) end end
+        for i, ctrl in pairs(Controls['Preset']) do ctrl.EventHandler=function() select_preset(i) end end
+        for i, ctrl in pairs(Controls['Stb Macro']) do
+            local invisible=Controls['Macro Class'][i].String == ' '
+            ctrl.IsInvisible=invisible
+            ctrl.EventHandler=function() screen_macros(i) end
+            if not invisible then pcall(function() ctrl.CssClass='btn '..Controls['Macro Class'][i].String end ) end
+        end
+        for i, ctrl in pairs(Controls['Fox Macro']) do
+            local invisible=FOXTEL_CLS[i] == nil
+            ctrl.IsInvisible=invisible
+            ctrl.EventHandler=function() source_macros(i) end
+            if not invisible then pcall(function() ctrl.CssClass='btn '..FOXTEL_CLS[i] end ) end
+        end
+        for i, ctrl in pairs(Controls['Videowall Brightness']) do ctrl.EventHandler=function()
+            if BrightTimer then BrightTimer:Stop() end
+            BrightTimer.EventHandler=function() screen_brightness(i) end
+            BrightTimer:Start(5)
+        end end
+
+        local screen=math.floor(Controls['Current Navigation'].Value)
+        Controls['Current Navigation'].Value=(screen + 1) % INT_PRESET
+        show_interface(screen)
+    end runtime_init()
+    function database_write_handelers()
+        -- Controls['Current Navigation'].EventHandler=function(c) show_interface(c.Value) end
+        -- Controls['Current Cluster'].EventHandler=function(c) select_cluster(c.Value) end
+        -- Controls['Current Panel'].EventHandler=function(c) select_panel_region(c.Value) end
+        -- Controls['Current Source'].EventHandler=function(c) select_source(c.Value) end
+        for i=1, Properties['Number of Clusters'].Value do 
+            Controls['Cluster DB'][i].EventHandler=function(c) 
+                local temp = eval(c.String)
+                if temp and type(temp) == 'table' then DB[i] = temp end
+            end
+            Controls['Active Preset'][i].EventHandler=function(c) select_preset(c.Value, i) end
+        end
+        local num_screens=Properties['Number of TVs'].Value + Properties['Number of STB'].Value
+        for i=1, num_screens do 
+            Controls['Active StbChn'][i].EventHandler=function(c) screen_macros(c.Value, i) end
+        end
+        for i=1, Properties['Number of Foxtel Boxes'].Value do 
+            Controls['Active FoxChn'][i].EventHandler=function(c) source_macros(c.Value, i) end
+        end
+    end database_write_handelers()
+end

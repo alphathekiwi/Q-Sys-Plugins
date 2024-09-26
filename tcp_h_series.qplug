@@ -1,0 +1,411 @@
+PluginInfo={
+    Name='H Series Videowall', Version='2.0', BuildVersion='0.24.05.07', Id='8bdf6969-9368-0TCP-0AV0-OVIDEOWALL00', Author='Total Concept Projects', Description='H Series Videowall\nAaron | alphathekiwi@gmail.com'
+}
+-- STATIC DEFS
+INT_HOME, INT_CLUSTER, INT_SETTINGS, INT_FOX, INT_VW_SRC, INT_PRESET, INT_MACRO, INT_CTRLS=1,2,3,4,5,6,7,8
+
+-- Defines the Controls used within the plugin
+function GetControls(props)
+    local ctrls={}
+    local inputcards=props['Input Cards'].Value
+    local outputcards=props['Output Cards'].Value
+    table.insert(ctrls, {Name='Input CMD', ControlType='Text', Count=1, UserPin=true, PinStyle='Input' })
+    table.insert(ctrls, {Name='Device ID', ControlType='Knob', ControlUnit='Integer', Min=0, Default=0, Max=255, Count=1 })
+    table.insert(ctrls, {Name='Device IP', ControlType='Text', Count=1 })
+    table.insert(ctrls, {Name='Device Port', ControlType='Text', Count=1 })
+    table.insert(ctrls, {Name='Screen ID', ControlType='Knob', ControlUnit='Integer', Min=-1, Default=-1, Max=255, Count=outputcards})
+    table.insert(ctrls, {Name='Brightness', ControlType='Knob', ControlUnit='Integer', Min=0, Default=255, Max=255, Count=outputcards})
+    table.insert(ctrls, {Name='Offset X', ControlType='Knob', ControlUnit='Integer', Min=0, Default=0, Max=19200, Count=outputcards})
+    table.insert(ctrls, {Name='Offset Y', ControlType='Knob', ControlUnit='Integer', Min=0, Default=0, Max=19200, Count=outputcards})
+    table.insert(ctrls, {Name='Merge With', ControlType='Knob', ControlUnit='Integer', Min=0, Default=0, Max=outputcards, Count=outputcards})
+    table.insert(ctrls, {Name='Total Presets', ControlType='Knob', ControlUnit='Integer', Min=1, Default=1, Max=255, Count=outputcards})
+    table.insert(ctrls, {Name='Current Preset', ControlType='Knob', ControlUnit='Integer', Min=0, Default=0, Max=255, Count=outputcards})
+    return ctrls
+end
+-- Layout of controls and graphics for the plugin UI to display
+function GetControlLayout(props)
+    local layout={}
+    local graphics={}
+    local outputcards=props['Output Cards'].Value
+    
+    table.insert(graphics, {Type='GroupBox', Fill={20, 20, 70, 50}, StrokeWidth=0, CornerRadius=0, Position={5, 5}, Size={616, 92 + (28 * outputcards)}})
+
+    table.insert(graphics, {Position={9, 9}, Size={80, 24}, Type='Text', Text='Device ID', FontSize=14, HTextAlign='Center'})
+    table.insert(graphics, {Position={93, 9}, Size={204, 24}, Type='Text', Text='Device IP', FontSize=14, HTextAlign='Center'})
+    table.insert(graphics, {Position={301, 9}, Size={60, 24}, Type='Text', Text='Port', FontSize=14, HTextAlign='Center'})
+    table.insert(graphics, {Position={429, 9}, Size={188, 24}, Type='Text', Text='CMD', FontSize=14, HTextAlign='Center'})
+    layout['Device ID']={Position={9, 37}, Size={80, 24}, FontSize=14, Margin=0, Padding=2, StrokeWidth=0}
+    layout['Device IP']={Position={93, 37}, Size={204, 24}, FontSize=14, Margin=0, Padding=2, StrokeWidth=0}
+    layout['Device Port']={Position={301, 37}, Size={60, 24}, FontSize=14, Margin=0, Padding=2, StrokeWidth=0}
+    layout['Input CMD']={Position={429, 37}, Size={188, 24}, FontSize=10, Margin=0, Padding=2, StrokeWidth=0, PrettyName='Cmd Input'}
+
+    table.insert(graphics, {Position={93, 69}, Size={80, 24}, Type='Text', Text='Screen ID', FontSize=14, HTextAlign='Center'})
+    table.insert(graphics, {Position={177, 69}, Size={120, 24}, Type='Text', Text='Brightness', FontSize=14, HTextAlign='Center'})
+    table.insert(graphics, {Position={301, 69}, Size={60, 24}, Type='Text', Text='Offset X', FontSize=14, HTextAlign='Center'})
+    table.insert(graphics, {Position={365, 69}, Size={60, 24}, Type='Text', Text='Offset Y', FontSize=14, HTextAlign='Center'})
+    table.insert(graphics, {Position={429, 69}, Size={60, 24}, Type='Text', Text='Group', FontSize=14, HTextAlign='Center'})
+    table.insert(graphics, {Position={493, 69}, Size={60, 24}, Type='Text', Text='Count', FontSize=14, HTextAlign='Center'})
+    table.insert(graphics, {Position={557, 69}, Size={60, 24}, Type='Text', Text='Current', FontSize=14, HTextAlign='Center'})
+
+    if outputcards > 1 then
+        for i=1, outputcards do
+            local y = (i-1)*28
+            table.insert(graphics, { Position={9, 97 + y}, Size={80, 24}, Type='Text', Text='Screen '..i, FontSize=14, HTextAlign='Center'})
+            layout['Screen ID ' .. i]={ Position={93, 97 + y}, Size={80, 24}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+            layout['Brightness ' .. i]={ Position={177, 97 + y}, Size={120, 24}, FontSize=18, Margin=0, Color={255, 241, 47}, StrokeWidth=0, Style='Fader'}
+            layout['Offset X ' .. i]={ Position={301, 97 + y}, Size={60, 24}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+            layout['Offset Y ' .. i]={ Position={365, 97 + y}, Size={60, 24}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+            layout['Merge With ' .. i]={ Position={429, 97 + y}, Size={60, 24}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+            layout['Total Presets ' .. i]={ Position={493, 97 + y}, Size={60, 24}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+            layout['Current Preset ' .. i]={ Position={557, 97 + y}, Size={60, 24}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+        end
+    else
+        table.insert(graphics, { Position={9, 97}, Size={80, 24}, Type='Text', Text='Screen 1', FontSize=14, HTextAlign='Center'})
+        layout['Screen ID']={ Position={93, 97}, Size={80, 24}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+        layout['Brightness']={ Position={177, 97}, Size={120, 24}, FontSize=18, Margin=0, Color={255, 241, 47}, StrokeWidth=0, Style='Fader'}
+        layout['Offset X']={ Position={301, 97}, Size={60, 24}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+        layout['Offset Y']={ Position={365, 97}, Size={60, 24}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+        layout['Merge With']={ Position={429, 97}, Size={60, 24}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+        layout['Total Presets']={ Position={493, 97}, Size={60, 24}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+        layout['Current Preset']={ Position={557, 97}, Size={60, 24}, FontSize=18, Margin=0, Padding=2, StrokeWidth=0}
+    end
+    return layout, graphics
+end
+-- Define the color of the plugin object in the design
+function GetColor(props) return {255, 241, 47} end
+-- The name that will initially display when dragged into a design
+function GetPrettyName(props) return 'H Series Novastar Videowall' end
+-- Define User configurable Properties of the plugin
+function GetProperties()
+    local props={}
+    table.insert(props, {Name='Manual Setup', Type='boolean', Value=false})
+    table.insert(props, {Name='Input Cards', Type='integer', Min=1, Max=40, Value=3})
+    table.insert(props, {Name='Output Cards', Type='integer', Min=1, Max=20, Value=2})
+    table.insert(props, {Name='Debug Print', Type='enum', Value='None', Choices={'None', 'Tx/Rx', 'Tx', 'Rx', 'Function Calls', 'All'}})
+    table.insert(props, {Name='Fold Debug', Type='boolean', Value=false})
+    return props
+end
+-- Optional function to update available properties when properties are altered by the user
+function RectifyProperties(props)
+    local debugging = props.plugin_show_debug.Value == false
+    props['Fold Debug'].IsHidden=debugging
+    props['Debug Print'].IsHidden=debugging
+    return props
+end
+-- Start event based logic
+if Controls then
+    -- STATIC DEFS
+    DB_X, DB_Y, DB_W, DB_H, DB_SRC, DB_DEF=1,2,3,4,5,6
+    DG_DG, DG_FN, DG_TX, DG_RX= 1,2,3,4
+    function dbg(m, s)
+        local mode=Properties['Debug Print'].Value -- {'None', 'Tx/Rx', 'Tx', 'Tx', 'Function Calls', 'All'}
+        if mode == 'Function Calls' and m == DG_FN then print(s)
+        elseif mode == 'Tx' and m == DG_TX then print(s)
+        elseif mode == 'Rx' and m == DG_RX then print(s)
+        elseif mode == 'Tx/Rx' and m >= DG_TX then print(s)
+        elseif mode == 'All' then print(s) end
+    end
+
+    -- HELPERS
+    function eval(s) return assert(load('return '..s))() end
+    function tbl_dump(o)
+        if type(o) == 'table' then
+            local s='{'
+            for k, v in pairs(o) do
+                if type(k) ~= 'number' then
+                    k='"' .. k .. '"'
+                end
+                s=s .. '[' .. k .. ']=' .. tbl_dump(v) .. ','
+            end
+            
+            -- local e, f=string.find(s, ',$')
+            -- if e then s=string.sub(s, e, f) end
+            return s .. '}'
+        else
+            if type(o) == 'number' then return tostring(o)
+            else return "'"..tostring(o).."'"
+    end end end
+    function strip_val(pattern, data, delim)
+        s, e=string.find(data, pattern)
+        d=delim or string.find(pattern, '=')
+        if s then return string.sub(data, s + d, e)
+        else return 0 end
+    end
+    function check_number(num, default, min, max)
+        if type(num) ~= 'number' then
+            num = tonumber(num)
+            if num == nil then return default end
+        end
+        if max and num > max then
+            return max
+        elseif min and num < min then
+            return min
+        end
+        return num
+    end
+    function check_ip(val)
+        local chunks = {string.match(val, "(%d+)%.(%d+)%.(%d+)%.(%d+)")}
+        if (#chunks == 4) then
+            for _, v in pairs(chunks) do
+                if (tonumber(v) < 0 or tonumber(v) > 255) then
+                    return nil;
+            end end
+            return val;
+        else return nil;
+    end end
+    function get_offset(s)
+        local numberoutputs = Properties['Output Cards'].Value
+        if numberoutputs > 1 then
+            local x = Controls['Offset X'][s].Value
+            local y = Controls['Offset Y'][s].Value
+            return x, y
+        else
+            local x = Controls['Offset X'].Value
+            local y = Controls['Offset Y'].Value
+            return x, y
+        end
+    end
+
+    -- QUEUE
+    function queue_add(queue, value)
+        local last=(queue.last or -1) + 1
+        queue.last=last
+        queue[last]=value
+        if (queue.len == nil or queue.len < 1) and type(queue.start) == 'function' then
+            queue:start()
+        end
+        queue.len=(queue.len or 0) + 1
+    end
+    function queue_pop(queue)
+        local first=(queue.first or 0)
+        if first > queue.last then
+            return nil
+        end
+        local value=queue[first]
+        queue[first]=nil -- to allow garbage collection
+        queue.first=first + 1
+        queue.len=queue.len - 1
+        if queue.len < 1 and type(queue.stop) == 'function' then
+            queue:stop()
+        end
+        return value
+    end
+    function queue_len(queue)
+        if queue.len then return queue.len end
+        return (queue.last or -1) + 1 - (queue.first or 0)
+    end
+    function queue_start()
+        dbg(DG_FN, 'queue_start')
+        QueueTimer=Timer.New()
+        QueueTimer.EventHandler=queue_exec
+        QueueTimer:Start(0.2)
+    end
+    function queue_stop()
+        dbg(DG_FN, 'queue_stop')
+        if QueueTimer then QueueTimer:Stop() end
+        QueueTimer=nil
+    end
+    function queue_exec()
+        -- Export commands to the H2
+        if queue_len(QUEUE) > 0 then
+            local cmd=queue_pop(QUEUE)
+            if cmd and cmd ~= '' then send_udp_data(cmd) end
+        end
+    end
+    QUEUE = {start=queue_start, stop=queue_stop}
+
+    -- COMMANDS
+    function cmd_set_brightness(screen_id, level)
+        local base_cmd = '\n{\n\t"cmd":"W0410",\n\t"deviceId":%s,\n\t"screenId":%d,\n\t"brightness":%d\n}'
+        return string.format(base_cmd, Controls['Device ID'].String, screen_id, check_number(level, 255, 0, 255))
+    end
+    function cmd_load_preset(screen_id, preset_id)
+        local base_cmd = '\n{\n\t"cmd":"W0605",\n\t"deviceId":%s,\n\t"screenId":%d,\n\t"presetId":%d\n}'
+        return string.format(base_cmd, Controls['Device ID'].String, screen_id, check_number(preset_id, 0, 0, 255))
+    end
+    function cmd_clear_preset(screen_id, preset_id)
+        local base_cmd = '\n{\n\t"cmd":"W0603",\n\t"deviceId":%s,\n\t"screenId":%d,\n\t"presetId":%d\n}'
+        return string.format(base_cmd, Controls['Device ID'].String, screen_id, check_number(preset_id, 0, 0, 255))
+    end
+    function cmd_open_layer(screen_id, layer_id, x,y,w,h, source, name)
+        local o_x, o_y = get_offset(screen_id)
+        local general ='"general":{\n\t\t"layerId":'..layer_id..',\n\t\t"name":"'..name..'",\n\t\t"sizeType":0,\n\t\t"type":1,\n\t\t"isBackground":false,\n\t\t"isFreeze":false,\n\t\t"flipType":0\n\t}'
+        local source = '"source":{\n\t\t"sourceType":1,\n\t\t"inputId":'..source..',\n\t\t"interfaceType":1,\n\t\t"cropId":255\n\t}'
+        local window = string.format('"window":{\n\t\t"width":%d,\n\t\t"height":%d,\n\t\t"x":%d,\n\t\t"y":%d\n\t}', w, h, o_x+x, o_y+y)
+        local base_cmd = '\n{\n\t"cmd":"W0502",\n\t"deviceId":%s,\n\t"screenId":%d,\n\t%s,\n\t%s,\n\t%s\n}'
+        return string.format(base_cmd, Controls['Device ID'].String, screen_id, general, source, window)
+    end
+    function cmd_close_layer(screen_id, layer_id)
+        local base_cmd = '\n{\n\t"cmd":"W0503",\n\t"deviceId":%s,\n\t"screenId":%d,\n\t"layerId":%d\n}'
+        return string.format(base_cmd, Controls['Device ID'].String, screen_id, layer_id)
+    end
+    -- [{"cmd":"W0506","deviceId":0,"screenId":0,"layerId":0,"inputId":0,"interfaceType":1,"cropId":255}]
+    function cmd_change_souce(screen_id, layer_id, input_id, crop_id)
+        local base_cmd = '\n{\n\t"cmd":"W0506",\n\t"deviceId":%s,\n\t"interfaceType":1,\n\t"screenId":%d,\n\t"layerId":%d,\n\t"inputId":%d,\n\t"cropId":%d\n}'
+        return string.format(base_cmd, Controls['Device ID'].String, screen_id, check_number(layer_id, 0, 0, 255), check_number(input_id, 0, 0, 255), check_number(crop_id, 255, 0, 255))
+    end
+    -- MULTI STEP COMMANDS
+    function close_all_layers(screen_id)
+        local close_cmd = ''
+        local numberinputs = Properties['Input Cards'].Value * 4 + 2
+        for i=0, numberinputs do
+            close_cmd = close_cmd..cmd_close_layer(screen_id, i)..','
+        end
+        return string.gsub(close_cmd, '},$', '}')
+    end
+    function open_all_layers(screen_id, regions)
+        local open_cmd = ''
+        for i, region in pairs(regions) do
+            local name = 'Region '..i..' HDMI '..region[DB_SRC]
+            open_cmd = open_cmd..cmd_open_layer(screen_id, i-1, region[DB_X], region[DB_Y], region[DB_W], region[DB_H], region[DB_SRC]-1, name)..','
+        end
+        return open_cmd
+    end
+    function load_layout(screen_id, regions)
+        queue_add(QUEUE, close_all_layers(screen_id))
+        local open_cmd = open_all_layers(screen_id, regions)
+        queue_add(QUEUE, string.gsub(open_cmd, '},$', '}'))
+    end
+    function save_preset(screen_id, regions, preset_id, preset_name)
+        queue_add(QUEUE, close_all_layers(screen_id))
+        local open_cmd = open_all_layers(screen_id, regions)
+        local save_cmd = '\n{\n\t"cmd":"W0602",\n\t"deviceId":%s,\n\t"screenId":%d,\n\t"presetId":%d\n\t"name":"%s"\n}'
+        open_cmd = open_cmd..string.format(save_cmd, Controls['Device ID'].String, screen_id, check_number(preset_id, 0, 0, 255), preset_name)
+        queue_add(QUEUE, open_cmd)
+    end
+
+    -- EVENT HANDLERS
+    function matches_cluster_id(cluster_id)
+        local numberoutputs = Properties['Output Cards'].Value
+        if numberoutputs > 1 then
+            for i, s in pairs(Controls['Screen ID']) do
+                if s.Value == tonumber(cluster_id or 0) then return i - 1 end
+            end
+        elseif Controls['Screen ID'].Value == tonumber(cluster_id or 0) then return 0
+        end return -1
+    end
+    function adjust_for_grouping(screen_id, preset_id)
+        local numberoutputs = Properties['Output Cards'].Value
+        if numberoutputs == 1 then 
+            Controls['Current Preset'].Value = preset_id
+            return screen_id, preset_id
+        end
+        local merging_id = Controls['Merge With'][screen_id+1].Value
+        if merging_id == 0 then return screen_id, preset_id end
+        if numberoutputs > 1 then Controls['Current Preset'][screen_id+1].Value = preset_id
+        else Controls['Current Preset'].Value = preset_id end
+        local previous = {}
+        local adjusted = 0
+        for i, s in pairs(Controls['Merge With']) do
+            if s.Value == merging_id then
+                local current = Controls['Current Preset'][i].Value
+                for _, pc in pairs(previous) do
+                    current = current * pc
+                end
+                adjusted = adjusted + current
+                previous[#previous+1] = Controls['Total Presets'][i].Value
+            end
+        end
+        return merging_id-1, adjusted
+    end
+    function total_linked_presets(screen_id, num_presets)
+        local numberoutputs = Properties['Output Cards'].Value
+        if numberoutputs == 1 then return num_presets end
+        local merging_id = Controls['Merge With'][screen_id+1].Value
+        if merging_id == 0 then return num_presets end
+        local total = 0
+        for i, s in pairs(Controls['Merge With']) do
+            if s.Value == merging_id then
+                total = total * Controls['Total Presets'][i].Value
+            end
+        end
+        return total - 1
+    end
+    function parse_commands(ctrl)
+        local numberoutputs = Properties['Output Cards'].Value
+        local data = ctrl.String
+        local p,s = strip_val('[Pp]anel=%d+', data, 6), strip_val('[Ss]creen=%d+', data, 7)
+        local screen_id = matches_cluster_id(p+s)
+        if screen_id > -1 then
+            if string.find(data, "[Pp]reset=") then
+                local preset_id = strip_val('[Pp]reset=%d+', data, 7)
+                screen_id, preset_id = adjust_for_grouping(screen_id, preset_id)
+                send_udp_data(cmd_load_preset(screen_id, preset_id))
+                dbg(DG_FN, 'Load Preset '..preset_id)
+            elseif string.find(data, "[Bb]rightness=") then
+                local level = strip_val('[Bb]rightness=%d+', data, 11)
+                send_udp_data(cmd_set_brightness(screen_id, level))
+                dbg(DG_FN, 'Set Brightness '..level)
+            elseif string.find(data, "[Ll]ayout=") then
+                local layout = eval(strip_val('[Ll]ayout=[^&]+', data, 7))
+                load_layout(screen_id, layout)
+                dbg(DG_FN, 'Load Layout')
+            elseif string.find(data, "[Ll]ayer=") then
+                local layer = tonumber(strip_val('[Ll]ayer=%d+', data, 6)) or 0
+                local source = tonumber(strip_val('[Ss]ource=%d+', data, 7)) or 0
+                local crop_id = tonumber(strip_val('[Cc]rop=%d+', data, 5)) or 255
+                screen_id, _ = adjust_for_grouping(screen_id, 0)
+                if not string.find(data, "[Cc]rop=") then crop_id = 255 end
+                send_udp_data(cmd_change_souce(screen_id, layer, source, crop_id))
+                dbg(DG_FN, 'Change Source for '.. layer..' to '..source)
+            end
+
+            -- Manual Setup will terminate parsing here if enabled
+            if Properties['Manual Setup'].Value then return
+            elseif string.find(data, "[Ss]etup=") then -- Screen=0
+                local preset_id = strip_val('[Ss]etup=%d+', data, 6)
+                local name = strip_val('[Nn]ame=[^,]+', data, 5)
+                local layout = eval(strip_val('[Rr]egions=[^&]+', data, 8))
+                save_preset(screen_id, layout, preset_id, name)
+                dbg(DG_FN, 'Save Preset '..name)
+            elseif string.find(data, "[Cc]lear_[Pp]resets") then
+                local num_presets = strip_val('[Cc]lear_[Pp]resets=%d+', data, 14)
+                if numberoutputs > 1 then Controls['Total Presets'][screen_id+1].Value = check_number(num_presets, 1, 1, 255)
+                else Controls['Total Presets'].Value = check_number(num_presets, 1, 1, 255) end
+                num_presets = total_linked_presets(screen_id, num_presets)
+                dbg(DG_FN, 'Clear Presets '..num_presets)
+                local cmd = ''
+                for i=0, num_presets do
+                    cmd = cmd_clear_preset(screen_id, i)..','
+                end
+                if cmd ~= '' then queue_add(QUEUE, string.gsub(cmd, '},$', '}')) end
+            end
+        end
+    end
+    function send_udp_data(data)
+        local data = string.gsub(data..']', '^\n{', '[{')
+        if not Properties['Fold Debug'].Value then dbg(DG_TX, "Sending UPD Data to "..DEVIVE_IP..':'..DEVICE_PORT..'\n'..data)
+        else dbg(DG_TX, "Sending UPD Data to "..DEVIVE_IP..':'..DEVICE_PORT..'\n'..string.gsub(data, '[\n\t]', '')) end
+        UDP_SOCK:Send(DEVIVE_IP, DEVICE_PORT, data)
+    end
+    function runtime_init()
+        DEVIVE_IP = check_ip(Controls['Device IP'].String) or '255.255.255.255'
+        DEVICE_PORT = tonumber(Controls['Device Port'].String) or 6000
+        Controls['Device IP'].EventHandler = function(c) DEVIVE_IP = check_ip(c.String) or '255.255.255.255' end
+        Controls['Device Port'].EventHandler = function(c) DEVICE_PORT = tonumber(c.String) or 6000 end
+        
+        local numberoutputs = Properties['Output Cards'].Value
+        if numberoutputs > 1 then
+            for i, ctrl in pairs(Controls['Brightness']) do
+                if System.IsEmulating then ctrl.Value = 255 end
+                ctrl.EventHandler = function(c) send_udp_data(cmd_set_brightness(i-1, c.Value)) end
+                Controls['Current Preset'][i].EventHandler = function(c)
+                    local screen_id, preset_id = adjust_for_grouping(i-1, c.Value)
+                    send_udp_data(cmd_load_preset(screen_id, preset_id))
+                end
+            end
+        else
+            if System.IsEmulating then Controls['Brightness'].Value = 255 end
+            Controls['Brightness'].EventHandler = function(c) send_udp_data(cmd_set_brightness(0, c.Value)) end
+            Controls['Current Preset'].EventHandler = function(c)
+                local screen_id, preset_id = adjust_for_grouping(i-1, c.Value)
+                send_udp_data(cmd_load_preset(screen_id, preset_id))
+            end
+        end
+        UDP_SOCK = UdpSocket.New()
+        UDP_SOCK:Open(nil, DEVICE_PORT)
+        UDP_SOCK.Data = function(udp, packet) dbg(DG_RX, packet.Data) end
+        Controls['Input CMD'].EventHandler = parse_commands
+    end runtime_init()
+        
+end

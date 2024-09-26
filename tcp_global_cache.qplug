@@ -1,0 +1,379 @@
+PluginInfo={
+    Name='TCP Global Cache', Version='2.0', BuildVersion='0.24.05.07', Id='8bdf6969-9368-0TCP-0AV0-GLOBAL0CACHE', Author='Total Concept Projects', Description='Global Cache\nAaron | alphathekiwi@gmail.com'
+}
+-- STATIC DEFS
+INT_HOME, INT_CLUSTER, INT_SETTINGS, INT_FOX, INT_VW_SRC, INT_PRESET, INT_MACRO, INT_CTRLS=1,2,3,4,5,6,7,8
+
+PageNames={'Main', 'IR Commands'}
+function GetPages(props)
+    local pages={}
+    for ix, name in ipairs(PageNames) do
+        table.insert(pages, {name=PageNames[ix]})
+    end
+    return pages
+end
+-- Defines the Controls used within the plugin
+function GetControls(props)
+    local ctrls={}
+    local ircmds=props['Number of IR Cmds'].Value
+    table.insert(ctrls, {Name='Device ID', ControlType='Knob', ControlUnit='Integer', Min=0, Default=0, Max=255, Count=1 })
+    table.insert(ctrls, {Name='Device IP', ControlType='Text', Count=1 })
+    table.insert(ctrls, {Name='Device Port', ControlType='Text', Count=1 })
+    table.insert(ctrls, {Name='Current Channel', ControlType='Knob', ControlUnit='Integer', Min=0, Default=0, Max=9999, Count=3 })
+    
+    table.insert(ctrls, {Name='ON', ControlType='Button', ButtonType='Toggle', Count=1 })
+    table.insert(ctrls, {Name='Load Commands', ControlType='Button', ButtonType='Toggle', Count=1 })
+    table.insert(ctrls, {Name='File Path', ControlType='Text', Count=1 })
+
+    table.insert(ctrls, {Name='Trunk CMDs', ControlType='Text', Count=1, UserPin=true, PinStyle='Input' })
+    table.insert(ctrls, {Name='Irhead CMD', ControlType='Text', Count=3, UserPin=true, PinStyle='Input' })
+
+    table.insert(ctrls, {Name='Send IR Cmd', ControlType='Button', ButtonType='Toggle', Count=ircmds})
+    table.insert(ctrls, {Name='IR Command', ControlType='Text', Count=ircmds})
+    return ctrls
+end
+-- Layout of controls and graphics for the plugin UI to display
+function GetControlLayout(props)
+    local layout={}
+    local graphics={}
+    local CurrentPage=PageNames[props['page_index'].Value]
+    local ircmds=props['Number of IR Cmds'].Value
+    if CurrentPage == 'Main' then
+        table.insert(graphics, {Type='GroupBox', Fill={20, 20, 70, 50}, StrokeWidth=0, CornerRadius=0, Position={5, 5}, Size={616, 148}})
+
+        table.insert(graphics, {Position={9, 9}, Size={148, 24}, Type='Text', Text='Device IP', FontSize=14, HTextAlign='Center'})
+        table.insert(graphics, {Position={161, 9}, Size={68, 24}, Type='Text', Text='Port', FontSize=14, HTextAlign='Center'})
+        table.insert(graphics, {Position={233, 9}, Size={76, 24}, Type='Text', Text='State', FontSize=14, HTextAlign='Center'})
+
+        layout['Device IP']={Position={9, 37}, Size={148, 24}, FontSize=14, Margin=0, Padding=2, StrokeWidth=0}
+        layout['Device Port']={Position={161, 37}, Size={68, 24}, FontSize=14, Margin=0, Padding=2, StrokeWidth=0}
+        layout['ON']={Position={233, 37}, Size={76, 24}, FontSize=14, Margin=0, Padding=2, StrokeWidth=0, Color={255, 150, 65}}
+
+        layout['Load Commands']={Position={313, 9}, Size={300, 24}, FontSize=14, Margin=0, Padding=2, StrokeWidth=0, Legend='Load Commands', Color={0,0,0,0}}
+        layout['File Path']={Position={313, 37}, Size={300, 24}, FontSize=14, Margin=0, Padding=2, StrokeWidth=0}
+
+        table.insert(graphics, {Position={9, 65}, Size={148, 24}, Type='Text', Text='Trunk CMDs', FontSize=14, HTextAlign='Center'})
+        layout['Trunk CMDs']={Position={9, 93}, Size={148, 24}, FontSize=10, Margin=0, Padding=2, StrokeWidth=0}
+        for i=1, 3 do
+            table.insert(graphics, {Position={9 + i*152, 65}, Size={148, 24}, Type='Text', Text='IR Head CMD '..i, FontSize=14, HTextAlign='Center'})
+            layout['Irhead CMD ' .. i]={Position={9 + i*152, 93}, Size={148, 24}, FontSize=10, Margin=0, Padding=2, StrokeWidth=0, PrettyName='IRhead '..i}
+            layout['Current Channel '..i]={Position={9 + i*152, 121}, Size={148, 24}, FontSize=14, Margin=0, Padding=2, StrokeWidth=0}
+        end
+        table.insert(graphics, {Position={9, 121}, Size={148, 24}, Type='Text', Text='Current Channel', FontSize=14, HTextAlign='Right'})
+    else
+        table.insert(graphics, {Type='GroupBox', Fill={20, 20, 70, 50}, StrokeWidth=0, CornerRadius=0, Position={5, 5}, Size={616, 4 + (28 * ircmds)}})
+        for i=1, ircmds do
+            table.insert(graphics, {Position={9, 9 + (i-1)*28}, Size={24, 24}, Type='Text', Text=''..i, FontSize=14, HTextAlign='Center'})
+            layout['Send IR Cmd ' .. i]={Position={37, 9 + (i-1)*28}, Size={60, 24}, FontSize=14, Margin=0, Padding=2, StrokeWidth=0, Legend='Cmd '..i}
+            layout['IR Command ' .. i]={Position={101, 9 + (i-1)*28}, Size={516, 24}, FontSize=14, Margin=0, Padding=2, StrokeWidth=0}
+        end
+    end
+    return layout, graphics
+end
+-- Define the color of the plugin object in the design
+function GetColor(props) return {255, 150, 65} end
+-- The name that will initially display when dragged into a design
+function GetPrettyName(props) return 'Gobal Cache IR Controller' end
+-- Define User configurable Properties of the plugin
+function GetProperties()
+    local props={}
+    table.insert(props, {Name='Number of IR Cmds', Type='integer', Min=12, Max=40, Value=24})
+    table.insert(props, {Name='Queue Speed Ms', Type='integer', Min=100, Max=3000, Value=500})
+    table.insert(props, {Name='Debug Print', Type='enum', Value='None', Choices={'None', 'Tx/Rx', 'Tx', 'Rx', 'Function Calls', 'All'}})
+    return props
+end
+-- Optional function to update available properties when properties are altered by the user
+function RectifyProperties(props)
+    props['Debug Print'].IsHidden=(props.plugin_show_debug.Value == false)
+    return props
+end
+-- Start event based logic
+if Controls then
+    DG_DG, DG_FN, DG_TX, DG_RX= 1,2,3,4
+    function dbg(m, s)
+        local mode=Properties['Debug Print'].Value -- {'None', 'Tx/Rx', 'Tx', 'Tx', 'Function Calls', 'All'}
+        if mode == 'Function Calls' and m == DG_FN then print(s)
+        elseif mode == 'Tx' and m == DG_TX then print(s)
+        elseif mode == 'Rx' and m == DG_RX then print(s)
+        elseif mode == 'Tx/Rx' and m >= DG_TX then print(s)
+        elseif mode == 'All' then print(s) end
+    end
+
+    -- HELPERS
+    function strip_val(pattern, data, delim)
+        s, e=string.find(data, pattern)
+        d=delim or string.find(pattern, '=')
+        if s then return string.sub(data, s + d, e)
+        else return 0 end
+    end
+    function check_number(num, default, min, max)
+        if type(num) ~= 'number' then
+            num = tonumber(num)
+            if num == nil then return default end
+        end
+        if max and num > max then
+            return max
+        elseif min and num < min then
+            return min
+        end
+        return num
+    end
+    function check_ip(val)
+        local chunks = {string.match(val, "(%d+)%.(%d+)%.(%d+)%.(%d+)")}
+        if (#chunks == 4) then
+            for _, v in pairs(chunks) do
+                if (tonumber(v) < 0 or tonumber(v) > 255) then
+                    return nil;
+            end end
+            return val;
+        else return nil;
+    end end
+
+    -- QUEUE
+    function queue_add(queue, value)
+        local last=(queue.last or -1) + 1
+        queue.last=last
+        queue[last]=value
+        if (queue.len == nil or queue.len < 1) and type(queue.start) == 'function' then
+            queue:start()
+        end
+        queue.len=(queue.len or 0) + 1
+    end
+    function queue_pop(queue)
+        local first=(queue.first or 0)
+        if first > queue.last then
+            return nil
+        end
+        local value=queue[first]
+        queue[first]=nil -- to allow garbage collection
+        queue.first=first + 1
+        queue.len=queue.len - 1
+        if queue.len < 1 and type(queue.stop) == 'function' then
+            queue:stop()
+        end
+        return value
+    end
+    function queue_len(queue)
+        if queue.len then return queue.len end
+        return (queue.last or -1) + 1 - (queue.first or 0)
+    end
+    function queue_start()
+        dbg(DG_FN, 'queue_start')
+        QueueTimer=Timer.New()
+        QueueTimer.EventHandler=queue_exec
+        local speed = Properties['Queue Speed Ms'].Value / 1000
+        QueueTimer:Start(speed)
+    end
+    function queue_stop()
+        dbg(DG_FN, 'queue_stop')
+        if QueueTimer then QueueTimer:Stop() end
+        QueueTimer=nil
+    end
+    function queue_exec()
+        -- Export commands to the H2
+        if queue_len(QUEUE) > 0 and Controls['ON'].Value then
+            local cmd=queue_pop(QUEUE)
+            dbg(DG_TX, 'sending: '..cmd)
+            if cmd and cmd ~= '' then 
+                TCPSOCK:Write(cmd..'\r')
+            end
+        end
+    end
+
+    -- NETWORK EVENTS
+    function handle_connected(sock)
+        dbg(DG_RX, "TCP socket is connected")
+        Controls['ON'].Color = '#69ff69'
+        Controls['ON'].Value = 1
+    end
+    function handle_reconnect(sock)
+        dbg(DG_RX, "TCP socket is reconnecting")
+        Controls['ON'].Color = '#ff6969'
+        Controls['ON'].Value = 0
+    end
+    function handle_data(sock)
+        dbg(DG_RX, "receiving: "..sock:Read(sock.BufferLength))
+    end
+    function handle_closed(sock)
+        dbg(DG_RX, "TCP socket was closed by the server")
+        Controls['ON'].Color = '#6969ff'
+        Controls['ON'].Value = 0
+    end
+    function handle_error(sock, err)
+        dbg(DG_RX, "TCP socket had an error: "..err)
+        Controls['ON'].Color = '#ff6969'
+        Controls['ON'].Value = 0
+    end
+    function handle_timeout(sock, err)
+        dbg(DG_RX, "TCP socket timed out "..err)
+        Controls['ON'].Color = '#ff6969'
+        Controls['ON'].Value = 0
+    end
+    function create_socket()
+        local sock = TcpSocket.New()
+        sock.Connected = handle_connected
+        sock.Reconnect = handle_reconnect
+        sock.Data = handle_data
+        sock.Closed = handle_closed
+        sock.Error = handle_error
+        sock.Timeout = handle_timeout
+        return sock
+    end
+
+    -- OPEN FILE HANDLERS
+    function OpenFile()
+        io.input(Controls.File.String)
+        filecontents = ''
+        filecontents = io.read("*all")
+        ExtractIrCodes(filecontents) 
+    end
+    function arrayToString(inarray)
+        local arraystring = ''
+        for i=1, #inarray do
+            arraystring = string.format("%s,%d",arraystring,inarray[i])  
+        end
+        return arraystring
+    end
+    function convertToGC(hex)
+        print("Converting to string",hex)  
+        hexTable = Split(hex," ")
+        local freq
+        freq = math.floor((4145146 / tonumber(hexTable[2],16)) / 1000) * 1000
+        intTable = ConvertToInt(hexTable,5)
+        arrayString = arrayToString(intTable)
+        gcstring = string.format("sendir,1:%s,1,%d,1,1%s\x0d\x0a",Controls.IrChannel.String,freq,arrayString)
+        return gcstring
+    end 
+    function ExtractIrCodes(filestring)
+        local chunk = ''
+        local hexstring = ''
+        local name = ''
+        local idx
+        local lines = {}
+        local pos1, pos2
+        lines = Split(filestring,"\x0a")
+        for i=1, #lines do
+            if(string.find(lines[i], 'remote=')) then
+                print('Found IR File Header\n')
+            elseif (string.find(lines[i], 'id=')) then
+                idx = tonumber(string.sub(lines[i],string.find(lines[i], 'id=') + 3,string.find(lines[i], '\x5d') - 1))
+                name = string.sub(lines[i],string.find(lines[i], '//..') + 4,string.len(lines[i]))
+                print(string.format('Found code %d %s\n', idx, name))
+                hexstring = lines[i + 1]
+                Controls['Send IR Cmd'][idx].Legend = name
+                Controls['IR Command'][idx].String = convertToGC(hexstring) 
+            end     
+        end
+    end
+
+    -- COMMAND HANDLERS
+    function format_cmd(irhead, cmd)
+        local s, e = string.find(cmd, 'sendir,1:%d')
+        if s then
+            cmd = string.sub(cmd, e + 1, string.len(cmd))
+            cmd = 'sendir,1:' .. irhead .. cmd
+        end queue_add(QUEUE, cmd)
+    end
+    function parse_commands(irhead, data)
+        dbg(DG_RX, '[IR '..irhead..'] parsing: '..data)
+        if string.find(data, '[Cc]ontrol=') then
+            local readable = strip_val('[Cc]ontrol=[^,]+', data, 8)
+            local cmd = CTRL_MAP[readable]
+            dbg(DG_FN, 'control='..readable..' cmd='..cmd)
+            local chn_ctrl = Controls['Current Channel'][irhead]
+            if chn_ctrl.Value > 0 then 
+                if cmd == 18 then chn_ctrl.Value = chn_ctrl.Value + 1
+                elseif cmd == 19 then chn_ctrl.Value = chn_ctrl.Value - 1 end
+            end
+            if Controls['IR Command'][cmd] then format_cmd(irhead, Controls['IR Command'][cmd].String) end
+        elseif string.find(data, '[Bb]utton=') then
+            local digit = tonumber(strip_val('[Bb]utton=%d+', data, 7))
+            dbg(DG_FN, 'button='..digit)
+            Controls['Current Channel'][irhead].Value = 0
+            if Controls['IR Command'][digit] then format_cmd(irhead, Controls['IR Command'][digit].String) end
+        elseif string.find(data, '[Pp]reset=') then
+            local chn = tonumber(strip_val('[Pp]reset=%d+', data, 7))
+            Controls['Current Channel'][irhead].Value = chn
+            send_channel(irhead, chn)
+        elseif string.find(data, '[Mm]acro=') then
+            local chn = tonumber(strip_val('[Mm]acro=%d+', data, 6))
+            Controls['Current Channel'][irhead].Value = chn
+            send_channel(irhead, chn)
+        end
+    end
+    function send_channel(irhead, channel)
+        local units = channel%10
+        local tens = math.floor((channel%100)/10)
+        local hundreds = math.floor(channel/100)
+        dbg(DG_FN, 'preset='..channel..' hundreds='..hundreds..' tens='..tens..' units='..units)
+        if(hundreds == 0) then format_cmd(irhead, Controls['IR Command'][10].String)
+        else format_cmd(irhead, Controls['IR Command'][hundreds].String) end
+        if(tens == 0) then format_cmd(irhead, Controls['IR Command'][10].String)
+        else format_cmd(irhead, Controls['IR Command'][tens].String) end 
+        if(units == 0) then format_cmd(irhead, Controls['IR Command'][10].String)
+        else format_cmd(irhead, Controls['IR Command'][units].String) end
+    end
+
+    -- INIT FUNCTIONS
+    function create_variables()
+        QUEUE = {start=queue_start, stop=queue_stop}
+        CTRL_MAP = {
+            ['UP']=11, ['DOWN']=12, ['LEFT']=13, ['RIGHT']=14,
+            ['OK']=15, ['MENU']=16, ['CH UP']=18, ['CH DOWN']=19,
+            ['EXIT']=17, ['PWR OFF']=20, ['PWR ON']=21,
+            -- ALTERNATIVE NAMES
+            ['CH DN']=19, ['OFF']=20, ['ON']=21
+        }
+        TCPSOCK = create_socket()
+        PollTimer = Timer.New()
+    end
+    function stop_driver()
+        dbg(DG_FN, 'stop_driver')
+        Controls['ON'].Color = '#ff6969'
+        if PollTimer then
+            PollTimer:Stop()
+        end
+        TCPSOCK = nil
+    end
+    function start_driver()
+        dbg(DG_FN, 'start_driver')
+        if not TCPSOCK then TCPSOCK = create_socket() end
+        Controls['ON'].Color = '#6969ff'
+        PollTimer:Start(20)
+        PollTimer.EventHandler = function()
+            dbg(DG_FN, 'checking device with blank command')
+            if Controls['ON'].Value > 0 then TCPSOCK:Write('\r') end
+        end
+        TCPSOCK:Connect(DEVIVE_IP, DEVICE_PORT)
+    end
+    function runtime_init()
+        DEVIVE_IP = check_ip(Controls['Device IP'].String)
+        DEVICE_PORT = tonumber(Controls['Device Port'].String) or 4998
+        Controls['Device IP'].EventHandler = function(c) DEVIVE_IP = check_ip(c.String) if DEVIVE_IP then start_driver() else stop_driver() end end
+        Controls['Device Port'].EventHandler = function(c) DEVICE_PORT = tonumber(c.String) or 4998 end
+        Controls["Load Commands"].EventHandler = function(c) if c.Value then OpenFile() end end
+        Controls['Trunk CMDs'].EventHandler = function(c) 
+            local irhead = tonumber(strip_val('[Ii][Rr]head=%d', c.String, 7))
+            if irhead > 3 or irhead < 1 then irhead = 1 end
+            parse_commands(irhead, c.String)
+        end
+        local numcmds = Properties['Number of IR Cmds'].Value
+        for i=1, 3 do 
+            Controls['Irhead CMD'][i].EventHandler = function(c) parse_commands(i, c.String) end
+            Controls['Current Channel'][i].EventHandler = function(c) send_channel(i, c.Value) end
+        end
+        for i=1, numcmds do Controls['Send IR Cmd'][i].EventHandler = function(c) format_cmd(1, Controls['IR Command'][i].String) end end
+        for i=1,10 do
+            if Controls['Send IR Cmd'][i] then Controls['Send IR Cmd'][i].Legend = i % 10 end
+        end
+        for k, v in pairs(CTRL_MAP) do
+            if Controls['Send IR Cmd'][v] then Controls['Send IR Cmd'][v].Legend = k end
+        end
+        if DEVIVE_IP then start_driver()
+        else stop_driver() end
+    end
+
+    -- INIT
+    create_variables()
+    runtime_init()
+end
