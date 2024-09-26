@@ -1,0 +1,7 @@
+# // Ignore data files in commits
+*.xml
+*.json
+# // Ignore testing files in commits
+*.tlua
+*.qplugt
+
