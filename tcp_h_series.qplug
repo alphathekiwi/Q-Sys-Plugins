@@ -241,12 +241,12 @@ if Controls then
     end
     -- [{"cmd":"W0506","deviceId":0,"screenId":0,"layerId":0,"inputId":0,"interfaceType":1,"cropId":255}]
     function cmd_change_souce(screen_id, layer_id, input_id, crop_id)
-        local base_cmd = '\n{\n\t"cmd":"W0506",\n\t"deviceId":%s,\n\t"interfaceType":1,\n\t"screenId":%d,\n\t"layerId":%d,\n\t"inputId":%d,\n\t"cropId":%d\n}'
+        local base_cmd = '\n{\n\t"cmd":"W0506",\n\t"interfaceType":1,\n\t"deviceId":%s,\n\t"screenId":%d,\n\t"layerId":%d,\n\t"inputId":%d,\n\t"cropId":%d\n}'
         return string.format(base_cmd, Controls['Device ID'].String, screen_id, check_number(layer_id, 0, 0, 255), check_number(input_id, 0, 0, 255), check_number(crop_id, 255, 0, 255))
     end
     -- MULTI STEP COMMANDS
     function close_all_layers(screen_id)
-        local close_cmd = ''
+        local close_cmd = '' 
         local numberinputs = Properties['Input Cards'].Value * 4 + 2
         for i=0, numberinputs do
             close_cmd = close_cmd..cmd_close_layer(screen_id, i)..','
@@ -269,7 +269,7 @@ if Controls then
     function save_preset(screen_id, regions, preset_id, preset_name)
         queue_add(QUEUE, close_all_layers(screen_id))
         local open_cmd = open_all_layers(screen_id, regions)
-        local save_cmd = '\n{\n\t"cmd":"W0602",\n\t"deviceId":%s,\n\t"screenId":%d,\n\t"presetId":%d\n\t"name":"%s"\n}'
+        local save_cmd = '\n{\n\t"cmd":"W0602",\n\t"deviceId":%s,\n\t"screenId":%d,\n\t"presetId":%d, \n\t"name":"%s"\n}'
         open_cmd = open_cmd..string.format(save_cmd, Controls['Device ID'].String, screen_id, check_number(preset_id, 0, 0, 255), preset_name)
         queue_add(QUEUE, open_cmd)
     end

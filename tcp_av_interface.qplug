@@ -1,5 +1,5 @@
 PluginInfo={
-    Name='AV Interface', Version='4.6.1', BuildVersion='0.24.05.07', Id='8bdf6969-9368-0TCP-0AV0-OINTERFACE00', Author='Total Concept Projects', Description='AV Control Interface Plugin\nAaron | alphathekiwi@gmail.com'
+    Name='AV Interface', Version='4.6.5', BuildVersion='0.24.05.07', Id='8bdf6969-9368-0TCP-0AV0-OINTERFACE00', Author='Total Concept Projects', Description='AV Control Interface Plugin\nAaron | alphathekiwi@gmail.com'
 }
 function eval(s) return assert(load('return '..s))() end
 function tbl_dump(o)
@@ -483,7 +483,7 @@ function GetControlLayout(props)
             layout['ON']={ Legend='ON', FontSize=30, Position={438, 219}, Size={160, 80}, Margin=0, Padding=2, StrokeWidth=0}
             layout['OFF']={ Legend='OFF', FontSize=30, Position={438, 315}, Size={160, 80}, Margin=0, Padding=2, StrokeWidth=0}
             layout['VW SRC']={ Legend='Videowall\nSource', FontSize=30, Position={438, 411}, Size={160, 80}, Margin=0, Padding=2, StrokeWidth=0}
-            layout['MCRS']={ Legend='Macros', FontSize=30, Position={438, 507}, Size={160, 80}, Margin=0, Padding=2, StrokeWidth=0}
+            layout['MCRS']={ Legend='Preset', FontSize=30, Position={438, 507}, Size={160, 80}, Margin=0, Padding=2, StrokeWidth=0}
             layout['CH UP']={ Legend='CH UP', FontSize=30, Position={719, 219}, Size={88, 80}, Margin=0, Padding=2, StrokeWidth=0}
             layout['CH DN']={ Legend='CH DN', FontSize=30, Position={719, 507}, Size={88, 80}, Margin=0, Padding=2, StrokeWidth=0}
             layout['UP']={ Legend='UP', FontSize=30, Position={823, 266}, Size={88, 80}, Margin=0, Padding=2, StrokeWidth=0}
@@ -1346,7 +1346,8 @@ if Controls then
         end
     end
     function toggle_tv_view()
-        local interface=Controls['Current Navigation'].Value
+        local interface=math.floor(Controls['Current Navigation'].Value)
+        dbg(DG_FN, 'toggle_tv_view '..interface)
         if interface == INT_MACRO then show_interface(INT_CTRLS)
         elseif interface == INT_CTRLS then show_interface(INT_MACRO) 
         else show_interface(INT_CLUSTER) end
@@ -1397,7 +1398,7 @@ if Controls then
     end
     function select_cluster(i)
         Controls['Current Cluster'].Value=i
-        if Controls['Number of Screens'][i].Value == 1 then
+        if Controls['Number of Screens'][i].Value == 1 and Controls['Number of Presets'][i].Value == 0  then
             Controls['Current Panel'].Value=1
             show_interface(INT_MACRO)
         else show_interface(INT_CLUSTER) end
@@ -1612,7 +1613,8 @@ if Controls then
     end
     function show_interface(index)
         if index == nil then index=INT_CLUSTER end
-        if Controls['Current Navigation'].Value ~= index then
+        if Controls['Current Navigation'].Value ~= 0 then
+            Controls['Current Navigation'].Value=index
             local vis={['HOME']=(index==INT_HOME and CLUSTERS>1), ['CLUSTER']=(index==INT_CLUSTER), ['CLUSTER28']=false, ['CLUSTER30']=false,
                         ['PRESETS']=(index==INT_PRESET),['MACROS']=(index==INT_MACRO), ['CONTROLS']=(index==INT_CTRLS),
                         ['FOXCTRL']=(index==INT_FOX), ['VWSOURCE']=(index==INT_VW_SRC), ['SETTINGS']=(index==INT_SETTINGS), ['NAVIGATION']=true}
@@ -1683,10 +1685,11 @@ if Controls then
                 vis['CLUSTER28']=regions[DB_W] ~= 30
                 vis['CLUSTER']=true
                 Controls['PRSTS'].IsInvisible=num_presets < 2
+                Controls['OFF'].IsInvisible=num_presets==0
+                Controls['ON'].IsInvisible=num_presets==0
                 set_legends(cluster_name)
             end
             set_layers_instant(vis)
-            Controls['Current Navigation'].Value=index
         end
     end -- BIG METHOD OF LAYER STATES
     function region_to_cmd(id, offset_x, offset_y, width, height, region, vwo)
@@ -1798,7 +1801,7 @@ if Controls then
                     local o_p = DB[i][DB_PRST + o_i]
                     local name = 'Preset '
                     if o_i == 0 then name = name..'off' else name = name..o_i end
-                    if o_p[DB_PSTNM] then name = o_p[DB_PSTNM] end
+                    if o_p and o_p[DB_PSTNM] then name = o_p[DB_PSTNM] end
                     local cmd='panel='..i..', setup='..o_i..', name='..name..', regions={'
                     cmd=preset_to_cmd(cmd, o_i, o_p, o_w, O_h, o_vwo, o_lyro)
                     queue_add(QUEUE[QUE_CLUSTER], cmd)
@@ -1816,20 +1819,58 @@ if Controls then
                 local ip_part = ''
                 if ip then ip_part = string.format(', ip=%d.%d.%d.%d', ip[1], ip[2], ip[3], math.min(ip[4]+s+offset, 255)) end
                 if num_screens < 2 then screen_name = cluster_name..' TV' end
-                queue_add(QUEUE[QUE_STB], {s+offset, 'name='..(pretty_name or screen_name)}) 
+                queue_add(QUEUE[QUE_STB], {s+offset, 'name='..(pretty_name or screen_name)..ip_part}) 
             end
         end
+    end
+    function log_preset_matrix(i, log_string)
+        local num_presets=cluster_ctrl('Number of Presets', i).Value
+        local linked = cluster_linked(i)
+        if num_presets > 0 and DB[i] then
+            queue_add(QUEUE[QUE_CLUSTER], 'panel='..i..', clear_presets='..math.floor(num_presets))
+            if linked and i % 2 == 1 and DB[i+1]then
+                local name = 'id: '..cluster_ctrl('Cluster Name', i).String..' '
+                while #name < 24 do name = name..' ' end
+                log_string = log_string..'\n'..name..'| '..cluster_ctrl('Cluster Name', i+1).String
+                local num_presets2 = cluster_ctrl('Number of Presets', i+1).Value
+                for e_i=0, num_presets2 do
+                    local e_p = DB[i + 1][DB_PRST + e_i]
+                    for o_i=0, num_presets do
+                        local o_p = DB[i][DB_PRST + o_i]
+                        local id = math.floor(o_i + (e_i * (num_presets + 1)))
+                        local name = id..': '
+                        if id < 10 then name = '0'..name end
+                        if o_i == 0 then name = name..'off ' else name = name..(o_p[DB_PSTNM] or o_i)..' ' end
+                        while #name < 24 do name = name..' ' end
+                        if e_i == 0 then name = name..'| off' else name = name..'| '..(e_p[DB_PSTNM] or e_i) end
+                        log_string = log_string..'\n'..name
+                end end
+            elseif not linked then
+                log_string = log_string..'\nid: '..cluster_ctrl('Cluster Name', i).String
+                for o_i=0, num_presets do
+                    local o_p = DB[i][DB_PRST + o_i]
+                    local name = o_i..': Preset'
+                    if o_i == 0 then name = name..' off'
+                    elseif o_p and o_p[DB_PSTNM] then name = o_i..': '..o_p[DB_PSTNM] end
+                    if o_i < 10 then name = '0'..name end
+                    log_string = log_string..'\n'..name
+                end 
+            end
+        end
+        return log_string
     end
     function parse_commands(ctrl)
         dbg(DG_RX, 'parse_commands '..ctrl.String)
         if ctrl.String ~= '' and ctrl.String ~= ' ' then
             local clusters=Properties['Number of Clusters'].Value
             local screens=Properties['Number of TVs'].Value + Properties['Number of STB'].Value
+            local instant_clear=false
             if ctrl.String == 'Start of Day' then                                 -- Start of Day command
                 for i=1, clusters do cluster_on_off(true, i) end
             elseif ctrl.String == 'End of Day' then                               -- End of Day command
                 for i=1, clusters do cluster_on_off(false, i) end
             elseif ctrl.String == 'Random Channels' then                          -- Random channels command
+                instant_clear = true
                 for s, _ in pairs(Controls['Screen CMD']) do
                     local chn=Controls['Macro Channel'][s].String
                     while chn == '' or chn == ' ' do
@@ -1838,7 +1879,60 @@ if Controls then
                     Controls['Active StbChn'][s].Value=tonumber(chn)
                     queue_add(QUEUE[QUE_STB], {s, 'macro='..chn})
                 end
+            elseif ctrl.String == 'Preset Step' then                             -- Log Preset Matrix command
+                instant_clear = true
+                local cluster_id, preset_id, e_preset = PRESET_STEP[INT_CLUSTER], PRESET_STEP[INT_PRESET], PRESET_STEP[INT_PRESET+1]
+                local num_presets=cluster_ctrl('Number of Presets', cluster_id).Value
+                local go_next_cluster = false
+                if cluster_linked(cluster_id) and i % 2 == 0 then go_next_cluster = true
+                elseif cluster_linked(cluster_id) and i % 2 == 1 and DB[cluster_id+1] then
+                    local dir = Properties['Link Clusters Direction'].Value
+                    local odd, even = (cluster_id - (1 - cluster_id%2)), (cluster_id + cluster_id%2)
+                    local o_vwo, e_vwo = DB[odd][DB_VWO], DB[even][DB_VWO]
+                    local o_lyro, e_lyro = DB[odd][DB_LYRO], DB[even][DB_LYRO]
+                    local o_w, o_h, e_w, e_h = DB[odd][DB_W], DB[odd][DB_H], DB[even][DB_W], DB[even][DB_H]
+                    local o_data, e_data = DB[odd][DB_PRST + preset_id], DB[even][DB_PRST + e_preset]
+                    local cmd = 'panel='..cluster_to_panel_id(odd)..', layout={'
+                    cmd = presets_to_cmd(cmd, preset_id, o_data, o_w, o_h, o_vwo, o_lyro, e_preset, e_data, e_w, e_h, e_vwo, e_lyro, dir)
+                    queue_add(QUEUE[QUE_CLUSTER], cmd)
+                    if preset_id < num_presets then
+                        PRESET_STEP[INT_PRESET] = preset_id + 1
+                    elseif e_preset < cluster_ctrl('Number of Presets', cluster_id+1).Value then
+                        PRESET_STEP[INT_PRESET] = 0
+                        PRESET_STEP[INT_PRESET+1] = e_preset + 1
+                    else go_next_cluster = true end
+                else
+                    local width, height = DB[cluster_id][DB_W], DB[cluster_id][DB_H]
+                    vwo=vwo or DB[cluster_id][DB_VWO] or 0
+                    lyro=lyro or DB[cluster_id][DB_LYRO] or 0
+                    local presets=DB[cluster_id][DB_PRST + preset_id]
+                    local cmd='panel='..cluster_id..', layout={'
+                    cmd = preset_to_cmd(cmd, preset_id, presets, width, height, vwo, lyro)
+                    queue_add(QUEUE[QUE_CLUSTER], cmd)
+                    if preset_id < num_presets then
+                        PRESET_STEP[INT_PRESET] = preset_id + 1
+                    else go_next_cluster = true end
+                end
+                if go_next_cluster then
+                    while cluster_id < clusters and cluster_ctrl('Number of Presets', cluster_id+1).Value == 0 do
+                        cluster_id = cluster_id + 1
+                        if cluster_id > clusters then break end
+                    end
+                    if cluster_id < clusters and cluster_ctrl('Number of Presets', cluster_id+1).Value > 0 then 
+                        PRESET_STEP={[INT_CLUSTER]=cluster_id+1, [INT_PRESET]=0, [INT_PRESET+1]=0}
+                    else
+                        PRESET_STEP = {[INT_CLUSTER]=1, [INT_PRESET]=0, [INT_PRESET+1]=0}
+                        print('Preset Step completed')
+                    end
+                end
+            elseif ctrl.String == 'Log Preset Matrix' then                        -- Log Preset Matrix command
+                local log_string = ''
+                for i=1, clusters do
+                    log_string = log_preset_matrix(i, log_string)
+                end
+                print(log_string)
             elseif ctrl.String == 'Setup' then                                    -- Setup command
+                instant_clear = true
                 for i=1, clusters do
                     run_regions_setup(i)
                 end
@@ -1919,7 +2013,8 @@ if Controls then
                 local s=tonumber(strip_val('[Ss]ource=%d+', ctrl.String, 7))
                 queue_add(QUEUE[QUE_SOURCE], {s, ctrl.String})
             end
-            if Properties['Clear Cmd Input'].Value then -- If clear input is enabled wait 10secs then clear input
+            if instant_clear then ctrl.String=' '
+            elseif Properties['Clear Cmd Input'].Value then -- If clear input is enabled wait 10secs then clear input
                 Timer.CallAfter(function() ctrl.String=' ' end, 10)
             end
         end
@@ -1929,6 +2024,7 @@ if Controls then
         QueueTimer=nil -- QUEUE INIT STUFF
         BrightTimer=Timer.New()
         QUEUE={{},{},{}}
+        PRESET_STEP = {[INT_CLUSTER]=1, [INT_PRESET]=0, [INT_PRESET+1]=0}
         QUE_CLUSTER, QUE_STB, QUE_SOURCE=1,2,3
         for q in pairs(QUEUE) do QUEUE[q].start=queue_start QUEUE[q].stop=queue_stop end
         -- INTERFACE VARS
@@ -1943,7 +2039,9 @@ if Controls then
         Controls['PRSTS'].EventHandler=function() show_interface(INT_PRESET) end
         Controls['STTNGS'].EventHandler=function() if not Properties['Disable Settings'].Value then show_interface(INT_SETTINGS) end end
         Controls['VW SRC'].EventHandler=function() show_interface(INT_VW_SRC) end
-        Controls['MCRS'].EventHandler=toggle_tv_view
+        Controls['MCRS'].EventHandler=function() show_interface(INT_MACRO) end
+        -- Controls['CTRLS'].EventHandler=function() show_interface(INT_CTRLS) end
+        -- Controls['MCRS'].EventHandler=toggle_tv_view
         Controls['CTRLS'].EventHandler=toggle_tv_view
         Controls['Input CMD'].EventHandler=parse_commands
 
@@ -1962,20 +2060,22 @@ if Controls then
         local screens = {}
         for i=1, 16 do -- Cluster setup
             local cluster_id = math.floor(Controls['Cluster Id'][i].Value)
-            Controls['Cluster'][i].IsInvisible= cluster_id==0
+            local num_screens= math.floor(Controls['Number of Screens'][i].Value)
+            local num_presets= math.floor(Controls['Number of Presets'][i].Value)
+            Controls['Cluster'][i].IsInvisible=(cluster_id==0 or (num_screens==0 and num_presets==0))
             Controls['Cluster'][i].EventHandler=function(c) select_cluster(i) end
             if cluster_id > 0 then
                 local name, screenname=Controls['Cluster Name'][i].String, ' Screen '
                 Controls['Cluster'][i].Legend=string.gsub(name, "\\n", "\n")
                 local offset=DB[cluster_id][DB_OFFST] or 0
-                if Controls['Number of Presets'][i].Value > 0 then
+                if num_presets > 0 then
                     Controls['Videowall Label'][next_vw].Legend=string.gsub(name, "\\n", " ")
                     next_vw=next_vw + 1
                     screenname=' Stb '
                 end
                 if name=='' or name==' ' then name='Cluster '..cluster_id end
                 if not (cluster_id%2 == 0 and cluster_linked(cluster_id)) then
-                    for s=1, Controls['Number of Screens'][i].Value do
+                    for s=1, num_screens do
                         table.insert(screens, name..screenname..math.floor(offset+s))
                         SCREENS_ID[name..screenname..math.floor(offset+s)]=offset + s
                     end
