@@ -79,6 +79,7 @@ function GetPrettyName(props) return 'H Series Novastar Videowall' end
 function GetProperties()
     local props={}
     table.insert(props, {Name='Manual Setup', Type='boolean', Value=false})
+    table.insert(props, {Name='Off is Last', Type='boolean', Value=false})
     table.insert(props, {Name='Input Cards', Type='integer', Min=1, Max=40, Value=3})
     table.insert(props, {Name='Output Cards', Type='integer', Min=1, Max=20, Value=2})
     table.insert(props, {Name='Debug Print', Type='enum', Value='None', Choices={'None', 'Tx/Rx', 'Tx', 'Rx', 'Function Calls', 'All'}})
@@ -286,6 +287,15 @@ if Controls then
     end
     function adjust_for_grouping(screen_id, preset_id)
         local numberoutputs = Properties['Output Cards'].Value
+        local off_is_last = Properties['Off is Last'].Value
+        if type(preset_id) ~= 'number' then
+            preset_id = tonumber(preset_id)
+            if preset_id == nil then preset_id = 0 end
+        end
+        if off_is_last then
+            if preset_id == 0 then preset_id = Controls['Total Presets'][screen_id+1].Value - 1
+            else preset_id = preset_id - 1 end
+        end
         if numberoutputs == 1 then 
             Controls['Current Preset'].Value = preset_id
             return screen_id, preset_id
