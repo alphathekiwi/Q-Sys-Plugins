@@ -171,7 +171,10 @@ SCREEN_SIZES[0]={1920, 1080, 28}
 CLR_REGIONS={
     {255, 194, 194}, {255, 225, 194}, {255, 255, 194}, {225, 255, 194},
     {194, 255, 194}, {194, 255, 225}, {194, 255, 255}, {194, 225, 255},
-    {194, 194, 255}, {225, 194, 255}, {255, 194, 255}, {255, 194, 225}
+    {194, 194, 255}, {225, 194, 255}, {255, 194, 255}, {255, 194, 225},
+    {105, 44, 44}, {105, 75, 44}, {105, 105, 44}, {75, 105, 44},
+    {44, 105, 44}, {44, 105, 75}, {44, 105, 105}, {44, 75, 105},
+    {44, 44, 105}, {75, 44, 105}, {105, 44, 105}, {105, 44, 75}
 }
 -- Defines the Controls used within the plugin
 function GetControls(props)
@@ -549,10 +552,11 @@ function GetProperties()
     table.insert(props, {Name='Number of TVs', Type='integer', Min=0, Max=50, Value=0})
     table.insert(props, {Name='Number of Foxtel Boxes', Type='integer', Min=0, Max=8, Value=0})
     table.insert(props, {Name='Number of Clusters', Type='integer', Min=1, Max=16, Value=1})
+    table.insert(props, {Name='Override Layout', Type='boolean', Value=false})
+    table.insert(props, {Name='Show Preset Names', Type='boolean', Value=false})
     table.insert(props, {Name='Regions Pixel Padding', Type='integer', Min=0, Max=4, Value=1})
     table.insert(props, {Name='Edges Pixel Padding', Type='integer', Min=0, Max=4, Value=0})
     table.insert(props, {Name='Link Clusters Direction', Type='enum', Value='Odd then Even', Choices={'Odd then Even', 'Even then Odd', 'Odd above Even', 'Even above Odd'}})
-    table.insert(props, {Name='Override Layout', Type='boolean', Value=false})
     for i=1, 15, 2 do
         table.insert(props, {Name='' .. i .. ' linked with ' .. (i + 1), Type='boolean', Value=false})
     end
@@ -845,31 +849,31 @@ if Controls then
     function redraw_preview()
         local p_w=get_floor_ctrl(Controls['Panels Width'])
         local p_h=get_floor_ctrl(Controls['Panels Height'])
-        local doc=nil
-        if p_w > 0 and p_h > 0 then doc=EzSVG.Document(p_w, p_h, 'dimgray')
-        else doc=EzSVG.Document(3360, 1296) end
+        -- p_w = eval_ctrl(Controls['Panels Width'], 16, p_h)
+        -- p_h = eval_ctrl(Controls['Panels Height'], p_w, 9)
+        if p_w == 0 then p_w = 3360 end
+        if p_h == 0 then p_h = 1296 end
+        local data = {}
+        while #data < DB_RGN do table.insert(data, 1) end
         for i=1, REGIONS do
-            local clr=string.format('#%02x%02x%02x', CLR_REGIONS[i][1], CLR_REGIONS[i][2], CLR_REGIONS[i][3])
-            EzSVG.setStyle({fill=clr, stroke_width=8, stroke='dimgray'})
             local x=eval_ctrl(Controls['Region X'][i], p_w,p_h)
             local y=eval_ctrl(Controls['Region Y'][i], p_w,p_h)
             local w=eval_ctrl(Controls['Region Width'][i], p_w,p_h)
             local h=eval_ctrl(Controls['Region Height'][i], p_w,p_h)
-            if w > 1 and h > 1 then
-                doc:add(EzSVG.Rect(tonumber(x), tonumber(y), tonumber(w), tonumber(h)))
-            end
+            table.insert(data, {x, y, w, h})
         end
-        local b64=Crypto.Base64Encode(doc:toString())
+        local b64=quick_draw_regions(p_w, p_h, data, true, true)
         draw_svg(Controls['VideowallRender'], b64)
     end
-    function quick_draw_regions(width, height, regions, preview)
+    function quick_draw_regions(width, height, regions, preview, hide_name)
         local doc=nil
         if width==0 and height==0 then width=3072 height=1152 end
+        local font_size=math.floor(height/12)
         doc=EzSVG.Document(width, height, 'dimgray')
         for i, r in pairs(regions or {}) do
             if i > DB_RGN then
-                if preview then EzSVG.setStyle({stroke_width=8, stroke='dimgray',
-                    fill=string.format('#%02x%02x%02x', CLR_REGIONS[i][1], CLR_REGIONS[i][2], CLR_REGIONS[i][3])})
+                if preview then
+                    EzSVG.setStyle({stroke_width=8, stroke='dimgray', fill=string.format('#%02x%02x%02x', CLR_REGIONS[i-DB_RGN][1], CLR_REGIONS[i-DB_RGN][2], CLR_REGIONS[i-DB_RGN][3])})
                 else EzSVG.setStyle({fill='#ffffff', stroke_width=8, stroke='dimgray'}) end
                 local x, y, w, h=r[1], r[2], r[3], r[4]
                 if type(x)=='number' and type(y)=='number' and type(w)=='number' and type(h)=='number' then 
@@ -878,8 +882,29 @@ if Controls then
                     if w <= 1 then w=width * w end
                     if h <= 1 then h=height * h end
                     doc:add(EzSVG.Rect(x, y, w, h))
+                    if preview then
+                        doc:add(EzSVG.Text(''..i-DB_RGN, x+(w/2), y+(h/2), {
+                            font_size=font_size,
+                            font_family= "Arial",
+                            text_anchor="middle",
+                            dominant_baseline="middle",
+                            fill= "#222222",
+                            stroke= "black"
+                        }))
+                    end
                 end 
             end
+        end
+        if Properties['Show Preset Names'].Value and not hide_name then
+            local preset_name=regions[DB_PSTNM] or 'Off Preset'
+            doc:add(EzSVG.Text(preset_name, width/2, height/2, {
+                font_size=font_size,
+                font_family= "Arial",
+                text_anchor="middle",
+                dominant_baseline="middle",
+                fill= "#222222",
+                stroke= "black"
+            }))
         end
         return Crypto.Base64Encode(doc:toString())
     end
@@ -917,6 +942,8 @@ if Controls then
         if cluster_id > 0 and (preset_id > 0 or num_presets == 0) then
             local width=get_floor_ctrl(Controls['Panels Width'])
             local height=get_floor_ctrl(Controls['Panels Height'])
+            -- width = eval_ctrl(Controls['Panels Width'], 16, height)
+            -- height = eval_ctrl(Controls['Panels Height'], width, 9)
             local dx, dy=get_diff(width, height)
             local pw=RENDER_ID[Controls['Panel Divisions'].String] or 28
             local name = Controls['Preset Pretty'].String
@@ -1049,7 +1076,7 @@ if Controls then
             end
             local names = DB[cluster_id][DB_NAMES] or {}
             if type(names) ~= 'table' then names={} end
-            for i=1, num_screens do
+            for i=1, REGIONS do
                 Controls['Source Pretty'][i].String=names[i] or ''
             end
         end
@@ -1057,11 +1084,15 @@ if Controls then
             PRESETS_ID={['Auto Layout']=0, ['Add Preset']=1}
             Controls['Select Preset'].Choices={'Add Preset'}
         end
+        local current = DB[cluster_id]
         if num_presets > 0 then
             set_preset_choices(num_presets)
-            local name = (DB[Controls['Editing Cluster'].Value][DB_PRST+1]or{})[DB_PSTNM]
+            local name = (current[DB_PRST+1]or{})[DB_PSTNM]
             if name then name = '1 '..name else name = 'Preset 1' end
             Controls['Select Preset'].String=name
+            videowall_select_preset(Controls['Select Preset'])
+        elseif current[DB_PRST] then
+            Controls['Select Preset'].String='Saved Layout'
             videowall_select_preset(Controls['Select Preset'])
         elseif num_screens < 9 then
             if Controls['Panels Width'].Value == 0 then Controls['Panels Width'].Value=SCREEN_SIZES[num_screens][1] end
@@ -1070,7 +1101,14 @@ if Controls then
             else Controls['Panel Divisions'].String=(SCREEN_SIZES[num_screens][3] or '28')..' Divisions' end
             local p_w=get_floor_ctrl(Controls['Panels Width'])
             local p_h=get_floor_ctrl(Controls['Panels Height'])
-            local svg=quick_draw_regions(p_w, p_h, QCK_REGIONS[SCREEN_LAYOUTS[num_screens]], true)
+            -- p_w = eval_ctrl(Controls['Panels Width'], 16, p_h)
+            -- p_h = eval_ctrl(Controls['Panels Height'], p_w, 9)
+            local regions = {}
+            while #regions < REGIONS do table.insert(regions, 1) end
+            for i=1, REGIONS do
+                regions[DB_RGN + i]=QCK_REGIONS[SCREEN_LAYOUTS[num_screens]][i]
+            end
+            local svg=quick_draw_regions(p_w, p_h, regions, true, false)
             draw_svg(Controls['VideowallRender'], svg)
             Controls['Select Preset'].String='Auto Layout'
             videowall_select_preset(Controls['Select Preset'])
@@ -1078,7 +1116,7 @@ if Controls then
     end
     function videowall_select_preset(ctrl)
         dbg(DG_FN, 'videowall_select_preset'..tbl_dump(PRESETS_ID))
-        local preset_id=math.floor(PRESETS_ID[ctrl.String])
+        local preset_id=math.floor(PRESETS_ID[ctrl.String] or 0)
         local cluster_id=Controls['Editing Cluster'].Value
         Controls['Editing Preset'].Value=preset_id
         Controls['Preset Quick Regions'].String=''
@@ -1128,7 +1166,7 @@ if Controls then
             screens.Value=num_screens
             if num_presets == 0 then
                 local idx = find_matching_custer_id(cluster_id, 0)
-                setup_cluster_screens(screens, idx, cluster_id, num_presets)
+                setup_cluster_screens(screens, cluster_id, num_presets)
                 Controls['Panels Width'].Value=DB[cluster_id][DB_W]
                 Controls['Panels Height'].Value=DB[cluster_id][DB_H]
                 videowall_select_preset(Controls['Select Preset'])
@@ -1146,6 +1184,8 @@ if Controls then
         if Controls['Panels Height'].Value == 0 then Controls['Panels Height'].Value=1152 db_set(cluster_id, DB_H, 1152) end
         local p_w=get_floor_ctrl(Controls['Panels Width'])
         local p_h=get_floor_ctrl(Controls['Panels Height'])
+        -- p_w = eval_ctrl(Controls['Panels Width'], 16, p_h)
+        -- p_h = eval_ctrl(Controls['Panels Height'], p_w, 9)
         local regions=QCK_REGIONS[ctrl.String]
         Controls['Preset Pretty'].String=ctrl.String
         for i=1, REGIONS do
@@ -1201,7 +1241,7 @@ if Controls then
             Controls['Cluster'][i].IsInvisible=true
         end
     end
-    function setup_cluster_screens(c, i, cluster_id, num_presets)
+    function setup_cluster_screens(c, cluster_id, num_presets)
         local num_screens=get_floor_ctrl(c)
         if num_presets == 0 and num_screens > 0 and num_screens < 9 then
             local width, height, pw=SCREEN_SIZES[num_screens][1], SCREEN_SIZES[num_screens][2], SCREEN_SIZES[num_screens][3]
@@ -1221,14 +1261,14 @@ if Controls then
         local linked = cluster_linked(cluster_id)
         if cluster_id%2==1 and linked then
             local np = cluster_ctrl('Number of Presets', cluster_id+1).Value
-            local screens=cluster_ctrl('Number of Screens', cluster_id+1)
-            if math.floor(screens.Value) ~= num_screens then screens.Value=num_screens
-            setup_cluster_screens(screens, i, cluster_id+1, np) end
+            local scrn_ctrl=cluster_ctrl('Number of Screens', cluster_id+1)
+            if math.floor(scrn_ctrl.Value) ~= num_screens then scrn_ctrl.Value=num_screens
+            setup_cluster_screens(scrn_ctrl, cluster_id+1, np) end
         elseif cluster_id%2==0 and linked then
             local np = cluster_ctrl('Number of Presets', cluster_id-1).Value
-            local screens=cluster_ctrl('Number of Screens', cluster_id-1)
-            if math.floor(screens.Value) ~= num_screens then screens.Value=num_screens
-            setup_cluster_screens(screens, i, cluster_id-1, np) end
+            local scrn_ctrl=cluster_ctrl('Number of Screens', cluster_id-1)
+            if math.floor(scrn_ctrl.Value) ~= num_screens then scrn_ctrl.Value=num_screens
+            setup_cluster_screens(scrn_ctrl, cluster_id-1, np) end
         end
     end
     function setup_cluster_presets(c, cluster_id)
@@ -1295,7 +1335,7 @@ if Controls then
             ctrl.EventHandler=function(c) setup_cluster_id(c, ctrl, i) end
             Controls['Cluster Name'][i].EventHandler=setup_cluster_name
             Controls['Number of Screens'][i].EventHandler=function(c) 
-                setup_cluster_screens(c, i, cluster_id, Controls['Number of Presets'][i].Value) 
+                setup_cluster_screens(c, cluster_id, Controls['Number of Presets'][i].Value) 
                 recalculate_offsets() end
             Controls['Number of Presets'][i].EventHandler=function(c) setup_cluster_presets(c, i, cluster_id) end
         end setup_cluster_name()
@@ -1327,14 +1367,23 @@ if Controls then
             ctrl.Value=(o == i)
         end
     end
-    function cluster_on_off(on_state, cluster_id)
-        if cluster_id == nil then cluster_id=current_cluster_floored('Cluster Id') end
+    function cluster_on_off(on_state, cluster_id, redraw)
+        if cluster_id == nil then cluster_id=current_cluster_floored('Cluster Id')
+        else redraw = true end
         dbg(DG_FN, 'cluster_on_off '..cluster_id)
-        if cluster_ctrl('Number of Presets', cluster_id).Value > 0 then
+        local num_presets=cluster_ctrl('Number of Presets', cluster_id).Value
+        if num_presets > 0 then
             if on_state then
                 local preset_id=math.floor(math.abs(Controls['Active Preset'][cluster_id].Value))
                 select_preset(preset_id, cluster_id)
             else select_preset(0, cluster_id) end
+            if redraw then
+                local width, height=(DB[cluster_id][DB_W] or 2048), (DB[cluster_id][DB_H] or 576)
+                if Controls['Active Preset'][cluster_id].Value > 0 then
+                    local regions=DB[cluster_id][DB_PRST + Controls['Active Preset'][cluster_id].Value]
+                    draw_svg(Controls['Render Panel'], quick_draw_regions(width, height, regions, false, false))
+                else draw_svg(Controls['Render Panel'], quick_draw_regions(0, 0, {[DB_PSTNM]='Off Preset'}, false, false)) end
+            end
         else
             local num_screens=cluster_ctrl('Number of Screens', cluster_id).Value
             local offset=DB[cluster_id][DB_OFFST] or 0
@@ -1546,7 +1595,7 @@ if Controls then
         local interface=Controls['Current Navigation'].Value
         if interface == INT_CLUSTER then
             dbg(DG_RX, 'cluster_controls '..'control=' .. name)
-            cluster_on_off(name == 'ON')
+            cluster_on_off(name == 'ON', nil, true)
         else
             local screen=get_current_screen()
             local active, idx, macro, queue=common_vals()
@@ -1579,9 +1628,11 @@ if Controls then
         if source_id == nil then source_id=math.floor(Controls['Current Source'].Value) end
         if FOXTEL_CLS[i] then
             Controls['Active FoxChn'][source_id].Value=i
-            if not pcall(function() Controls['FoxChn'][source_id].CssClass='transparent '..FOXTEL_CLS[i] end) then 
-                Controls['FoxChn'][source_id].Legend = ''..FOXTELS_MAPS[i] 
-            else Controls['FoxChn'][source_id].Legend = '' end
+            local status, err = pcall(function()
+                Controls['FoxChn'][source_id].Legend = ''
+                Controls['FoxChn'][source_id].CssClass='transparent '..FOXTEL_CLS[i]
+            end)
+            if not status then Controls['FoxChn'][source_id].Legend = ''..FOXTELS_MAPS[i] end
             dbg(DG_RX, 'source_macros '..source_id..' '..i)
             feedback(Controls['Fox Macro'], i)
             queue_add(QUEUE[QUE_SOURCE], {source_id, 'preset=' .. FOXTELS_MAPS[i]})
@@ -1627,7 +1678,6 @@ if Controls then
             local cluster_name=string.gsub(current_cluster_floored('Cluster Name'), "\\n", "\n")
             local num_presets=current_cluster_floored('Number of Presets')
             local hide=Properties['Hide off control'].Value
-            Controls['OFF'].IsInvisible=(index == INT_CTRLS and (hide == 'Always' or (hide == 'If Presets enabled' and num_presets > 0)))
             if vis['HOME'] then set_legends('HOME')
             elseif vis['SETTINGS'] then set_legends('SETTINGS')
             elseif vis['VWSOURCE'] then
@@ -1647,13 +1697,17 @@ if Controls then
             elseif vis['MACROS'] or vis['CONTROLS'] then -- Screen channels / controls
                 local screen_id=get_current_screen()
                 Controls['VW SRC'].IsInvisible = num_presets <= 0
+                Controls['OFF'].IsInvisible=(hide == 'Always' or (hide == 'If Presets enabled' and num_presets > 0))
+                Controls['ON'].IsInvisible=false
                 if screen_id == 0 then return show_interface(INT_HOME) end
                 local screen_name='Screen '..math.floor(screen_id)
                 local num_screens=current_cluster_floored('Number of Screens')
                 if num_screens < 2 then screen_name='TV' end
                 local names = DB[cluster_id][DB_NAMES] or {}
                 if type(names) ~= 'table' then names={} end
-                local pretty_name = names[screen_id]
+                local offset = DB[cluster_id][DB_OFFST] or 0
+                local pretty_name = names[screen_id - offset]
+                print('pretty_name', pretty_name or 'nil', '', tbl_dump(names))
                 if index == INT_MACRO then -- screen channels
                     local chn_db = Controls['Active StbChn'][screen_id]
                     if not chn_db then
@@ -1669,7 +1723,7 @@ if Controls then
                     local data=DB[cluster_id][DB_PRST+i]
                     Controls['Preset'][i].IsInvisible=data==nil
                     if data then
-                        local svg=quick_draw_regions(width, height, data, false)
+                        local svg=quick_draw_regions(width, height, data, false, false)
                         draw_svg(Controls['Preset'][i], svg)
                     end
                 end
@@ -1680,13 +1734,13 @@ if Controls then
                 local regions=DB[cluster_id][DB_PRST+preset_id] or {}
                 local width, height=(DB[cluster_id][DB_W] or 2048), (DB[cluster_id][DB_H] or 576)
                 -- dbg(DG_FN, 'preset '..preset_id..' width '..width..' height '..height..' regions '..tbl_dump(regions))
-                draw_svg(Controls['Render Panel'], quick_draw_regions(width, height, regions, false))
+                draw_svg(Controls['Render Panel'], quick_draw_regions(width, height, regions, false, num_presets < 2))
                 vis['CLUSTER30']=regions[DB_W] == 30
                 vis['CLUSTER28']=regions[DB_W] ~= 30
                 vis['CLUSTER']=true
                 Controls['PRSTS'].IsInvisible=num_presets < 2
-                Controls['OFF'].IsInvisible=num_presets==0
-                Controls['ON'].IsInvisible=num_presets==0
+                Controls['OFF'].IsInvisible=false
+                Controls['ON'].IsInvisible=false
                 set_legends(cluster_name)
             end
             set_layers_instant(vis)
@@ -2028,9 +2082,11 @@ if Controls then
         QUE_CLUSTER, QUE_STB, QUE_SOURCE=1,2,3
         for q in pairs(QUEUE) do QUEUE[q].start=queue_start QUEUE[q].stop=queue_stop end
         -- INTERFACE VARS
-        -- Controls['Home'].CssClass='transparent bc_home'
-        -- Controls['Base 1'].CssClass='transparent bc_odd'
-        -- Controls['Base 2'].CssClass='transparent bc_even'
+        pcall(function()
+            Controls['Home'].CssClass='transparent bc_home'
+            Controls['Base 1'].CssClass='transparent bc_odd'
+            Controls['Base 2'].CssClass='transparent bc_even'
+        end)
         Controls['Home'].EventHandler=function() show_interface(INT_HOME) end
         Controls['Label 1'].EventHandler=function() if Controls['Current Navigation'].Value > INT_CLUSTER then 
             if current_cluster_floored('Number of Screens') < 2 then show_interface(INT_HOME) 
@@ -2106,20 +2162,41 @@ if Controls then
             local invisible=Controls['Macro Class'][i].String == ' '
             ctrl.IsInvisible=invisible
             ctrl.EventHandler=function() screen_macros(i) end
-            if not invisible then pcall(function() ctrl.CssClass='btn '..Controls['Macro Class'][i].String end ) end
+            if not invisible then 
+                if not pcall(function()
+                    ctrl.CssClass='btn '..Controls['Macro Class'][i].String
+                end ) then
+                    ctrl.Legend=Controls['Macro Class'][i].String
+                end
+            end
         end
         for i, ctrl in pairs(Controls['Fox Macro']) do
             local invisible=FOXTEL_CLS[i] == nil
             ctrl.IsInvisible=invisible
             ctrl.EventHandler=function() source_macros(i) end
-            if not invisible then pcall(function() ctrl.CssClass='btn '..FOXTEL_CLS[i] end ) end
-        end
+            if not invisible then 
+                if not pcall(function()
+                    ctrl.CssClass='btn '..FOXTEL_CLS[i] ctrl.Legend=''
+                end ) then
+                    ctrl.Legend=FOXTELS_MAPS[i]
+        end end end
         for i, ctrl in pairs(Controls['Videowall Brightness']) do ctrl.EventHandler=function()
             if BrightTimer then BrightTimer:Stop() end
             BrightTimer.EventHandler=function() screen_brightness(i) end
             BrightTimer:Start(5)
         end end
 
+        for i, ctrl in pairs(Controls['Active FoxChn']) do 
+            local current = math.floor(ctrl.Value)
+            if current < 1 or current > 11 then current=i end
+            local status, err = pcall(function()
+                Controls['FoxChn'][i].Legend=''
+                Controls['FoxChn'][i].CssClass='transparent '..FOXTEL_CLS[current]
+            end ) 
+            if not status then
+                Controls['FoxChn'][i].Legend=FOXTELS_MAPS[current]
+            end
+        end
         local screen=math.floor(Controls['Current Navigation'].Value)
         Controls['Current Navigation'].Value=(screen + 1) % INT_PRESET
         show_interface(screen)
