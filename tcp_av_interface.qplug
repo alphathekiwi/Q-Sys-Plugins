@@ -1245,6 +1245,7 @@ if Controls then
         local num_screens=get_floor_ctrl(c)
         if num_presets == 0 and num_screens > 0 and num_screens < 9 then
             local width, height, pw=SCREEN_SIZES[num_screens][1], SCREEN_SIZES[num_screens][2], SCREEN_SIZES[num_screens][3]
+            if not DB[cluster_id] then DB[cluster_id]={} end
             DB[cluster_id][DB_W] = width
             DB[cluster_id][DB_H] = height
             local dx, dy=get_diff(width, height)
@@ -1870,6 +1871,7 @@ if Controls then
                 local names = DB[i][DB_NAMES] or {}
                 if type(names) ~= 'table' then names={} end
                 local pretty_name = names[s]
+                if pretty_name then pretty_name = cluster_name..' '..pretty_name end
                 local ip_part = ''
                 if ip then ip_part = string.format(', ip=%d.%d.%d.%d', ip[1], ip[2], ip[3], math.min(ip[4]+s+offset, 255)) end
                 if num_screens < 2 then screen_name = cluster_name..' TV' end
