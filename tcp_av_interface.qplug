@@ -554,6 +554,7 @@ function GetProperties()
     table.insert(props, {Name='Number of Clusters', Type='integer', Min=1, Max=16, Value=1})
     table.insert(props, {Name='Override Layout', Type='boolean', Value=false})
     table.insert(props, {Name='Show Preset Names', Type='boolean', Value=false})
+    table.insert(props, {Name='Allow Override Layer', Type='boolean', Value=false})
     table.insert(props, {Name='Regions Pixel Padding', Type='integer', Min=0, Max=4, Value=1})
     table.insert(props, {Name='Edges Pixel Padding', Type='integer', Min=0, Max=4, Value=0})
     table.insert(props, {Name='Link Clusters Direction', Type='enum', Value='Odd then Even', Choices={'Odd then Even', 'Even then Odd', 'Odd above Even', 'Even above Odd'}})
@@ -1429,10 +1430,13 @@ if Controls then
         end
     end
     function select_panel_region(i, s)
-        Controls['Current Panel'].Value=i
         if s and s > 0 then
+            Controls['Current Panel'].Value=i
             show_interface(INT_MACRO)
-        else show_interface(INT_VW_SRC) end
+        elseif Properties['Allow Override Layer'].Value and current_cluster_floored('Number of Screens') > 0 then
+            Controls['Current Panel'].Value=i
+            show_interface(INT_VW_SRC)
+        end
     end
     function select_source(i)
         local interface=math.floor(Controls['Current Navigation'].Value)
@@ -1594,7 +1598,7 @@ if Controls then
     end
     function common_controls(name)
         local interface=Controls['Current Navigation'].Value
-        if interface == INT_CLUSTER then
+        if interface == INT_CLUSTER or interface == INT_PRESET then
             dbg(DG_RX, 'cluster_controls '..'control=' .. name)
             cluster_on_off(name == 'ON', nil, true)
         else
