@@ -1235,15 +1235,29 @@ if Controls then
     end
     function setup_macros(ctrl, i)
         local class=ctrl.String
-        local chn  =Controls['Macro Channel'][i].String
+        local chn = Controls['Macro Channel'][i].String
         if  class==' ' then Controls['Macro Channel'][i].String=''
-        elseif chn=='' then Controls['Macro Channel'][i].String=''..DEFAULT_CHN[class] end
+        elseif chn=='' then Controls['Macro Channel'][i].String=''..(DEFAULT_CHN[class] or '999') end
         
-        if ctrl.String ~= ' ' then
-            pcall(function() Controls['Stb Macro'][i].CssClass='btn '..ctrl.String end)
+        local invisible = class == ' '
+        local normal = table.contains(FTA_CLS, class) or table.contains(MOD_CLS, class)
+        Controls['Stb Macro'][i].IsInvisible=invisible
+        Controls['Stb Macro'][i].EventHandler=function() screen_macros(i) end
+        if normal and not invisible then
+            if not pcall(function()
+                ctrl.Legend=''
+                ctrl.CssClass='btn '..class
+            end ) then
+                ctrl.Legend=class
+            end
+        elseif not invisible then
+            if not pcall(function()
+                ctrl.Legend=class
+                ctrl.CssClass='btn'
+            end ) then
+                ctrl.Legend=class
+            end
         end
-        -- Controls['Stb Macro'][i].CssClass='btn'..ctrl.String
-        Controls['Stb Macro'][i].IsInvisible = ctrl.String == ' '
     end
     function setup_cluster_id(c, ctrl, i)
         update_visiblity_cluster_setup(i, ctrl.Value == 0)
