@@ -1,8 +1,6 @@
 PluginInfo={
     Name='TCP Global Cache', Version='2.0', BuildVersion='0.24.05.07', Id='8bdf6969-9368-0TCP-0AV0-GLOBAL0CACHE', Author='Total Concept Projects', Description='Global Cache\nAaron | alphathekiwi@gmail.com'
 }
--- STATIC DEFS
-INT_HOME, INT_CLUSTER, INT_SETTINGS, INT_FOX, INT_VW_SRC, INT_PRESET, INT_MACRO, INT_CTRLS=1,2,3,4,5,6,7,8
 
 PageNames={'Main', 'IR Commands'}
 function GetPages(props)

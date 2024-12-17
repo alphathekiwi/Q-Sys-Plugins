@@ -1,5 +1,5 @@
 PluginInfo={
-    Name='AV Interface', Version='4.6.5', BuildVersion='0.24.05.07', Id='8bdf6969-9368-0TCP-0AV0-OINTERFACE00', Author='Total Concept Projects', Description='AV Control Interface Plugin\nAaron | alphathekiwi@gmail.com'
+    Name='AV Interface', Version='4.6.8', BuildVersion='0.24.05.07', Id='8bdf6969-9368-0TCP-0AV0-OINTERFACE00', Author='Total Concept Projects', Description='AV Control Interface Plugin\nAaron | alphathekiwi@gmail.com'
 }
 function eval(s) return assert(load('return '..s))() end
 function tbl_dump(o)
@@ -36,6 +36,14 @@ function strip_val(pattern, data, delim)
     d=delim or string.find(pattern, '=')
     if s then return string.sub(data, s + d, e)
     else return 0 end
+end
+function table.contains(table, element)
+    for _, value in pairs(table) do
+        if value == element then
+            return true
+        end
+    end
+    return false
 end
 -- STATIC DEFS
 INT_HOME, INT_CLUSTER, INT_SETTINGS, INT_FOX, INT_VW_SRC, INT_PRESET, INT_MACRO, INT_CTRLS=1,2,3,4,5,6,7,8
@@ -189,6 +197,7 @@ function GetControls(props)
         table.insert(ctrls, {Name='Panels Width', ControlType='Knob', ControlUnit='Integer', Min=0, Max=19200, Count=1})
         table.insert(ctrls, {Name='Panels Height', ControlType='Knob', ControlUnit='Integer', Min=0, Max=10800, Count=1})
         table.insert(ctrls, {Name='Preset Quick Regions', ControlType='Text', Count=1})
+        table.insert(ctrls, {Name='Preset Inheritance', ControlType='Text', Count=1})
         table.insert(ctrls, {Name='Panel Divisions', ControlType='Text', Count=1})
         table.insert(ctrls, {Name='Videowall Source Offset', ControlType='Knob', ControlUnit='Integer', Min=-48, Max=48, Count=1})
         table.insert(ctrls, {Name='Videowall Layer Offset', ControlType='Knob', ControlUnit='Integer', Min=-255, Max=255, Count=1})
@@ -317,8 +326,8 @@ function GetControlLayout(props)
         table.insert(graphics, {Type='Text', Text='Quick action', Position={437, 581}, Size={160, 32}, FontSize=14, HTextAlign='Center'})
         table.insert(graphics, {Type='Text', Text='Starting IP', Position={437, 669}, Size={160, 32}, FontSize=14, HTextAlign='Center'})
     elseif CurrentPage == 'Videowalls' then
-        layout['VideowallRender']={Style='Button', Position={576,205}, Size={420, 162}, Margin=0, Padding=0, StrokeWidth=0}
-        table.insert(graphics, {Type='GroupBox', Position={577,206}, Size={418, 160}, StrokeWidth=2, CornerRadius=0, Fill={20, 20, 70, 100} })
+        layout['VideowallRender']={Style='Button', Position={576,378}, Size={420, 162}, Margin=0, Padding=0, StrokeWidth=0}
+        table.insert(graphics, {Type='GroupBox', Position={577,379}, Size={418, 160}, StrokeWidth=2, CornerRadius=0, Fill={20, 20, 70, 100} })
         layout['Editing Cluster']={ Style='Text', Size={30, 30}, Position={21, 41}, FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
         layout['Select Cluster']={ Style='ComboBox', Size={246, 30}, Position={51, 41}, FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
         layout['Editing Preset']={ Style='Text', Size={30, 30}, Position={313, 41}, FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
@@ -343,6 +352,9 @@ function GetControlLayout(props)
         table.insert(graphics, {Type='Text', Position={575, 83}, Size={204, 20}, Text='Panel Divisions', FontSize=16, HTextAlign='Center'})
         table.insert(graphics, {Type='Text', Position={791, 83}, Size={204, 20}, Text='Videowall Layer Offset', FontSize=16, HTextAlign='Center'})
 
+        layout['Preset Inheritance']={Style='ComboBox', Position={575, 165}, Size={204, 30}, FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
+        table.insert(graphics, {Type='Text', Position={575, 145}, Size={204, 20}, Text='Preset Inheritance', FontSize=16, HTextAlign='Center'})
+
         table.insert(graphics, {Type='Text', Text='Custom Names', Position={21, 175}, Size={80, 30}, FontSize=12, HTextAlign='Center'})
         table.insert(graphics, {Type='Text', Text='Source', Position={125, 175}, Size={84, 30}, FontSize=12, HTextAlign='Center'})
         table.insert(graphics, {Type='Text', Text='Default', Position={217, 175}, Size={80, 30}, FontSize=12, HTextAlign='Center'})
@@ -363,7 +375,7 @@ function GetControlLayout(props)
         end
         table.insert(graphics, {
             Type='Text', Text='Common pixel pitches we use are:\n384 x 216  <or>  512 x 288\nMultiply the above pitch by number of\nframes wide and high the screen is.\nThe numbers you get should be devisable by 16x9\nFor default valid values are:\n[<Channel Number>, HDMI 1, HDMI 2, DTV]',
-            Position={576,414}, Size={420, 154}, FontSize=18, CornerRadius=0})
+            Position={576,587}, Size={420, 154}, FontSize=18, CornerRadius=0})
     elseif CurrentPage == 'Database' then
         local clusters=props['Number of Clusters'].Value
         local foxtels=props['Number of Foxtel Boxes'].Value
@@ -565,6 +577,7 @@ function GetProperties()
     table.insert(props, {Name='Limit of Regions', Type='integer', Min=1, Max=24, Value=12})
 
     table.insert(props, {Name='Hide off control', Type='enum', Value='If Presets enabled', Choices={'Always', 'If Presets enabled', 'Never'}})
+    table.insert(props, {Name='Cmd Output Speed', Type='integer', Min=1, Max=20, Value=4})
     table.insert(props, {Name='Clear Cmd Input', Type='boolean', Value=true})
     table.insert(props, {Name='Disable Settings', Type='boolean', Value=true})
     table.insert(props, {Name='Hide UCI layers', Type='boolean', Value=true})
@@ -634,10 +647,11 @@ if Controls then
         return (queue.last or -1) + 1 - (queue.first or 0)
     end
     function queue_start()
-        dbg(DG_FN, 'queue_start')
+        local speed = 0.1 * Properties['Cmd Output Speed'].Value
+        dbg(DG_FN, 'queue_start with speed: ', speed)
         QueueTimer=Timer.New()
         QueueTimer.EventHandler=queue_exec
-        QueueTimer:Start(0.2)
+        QueueTimer:Start(speed)
     end
     function queue_stop()
         dbg(DG_FN, 'queue_stop')
@@ -713,7 +727,7 @@ if Controls then
             return chunks;
         else return nil;
     end end
-    DB_ID, DB_OFFST, DB_PSTNM, DB_RGN, DB_VWO, DB_LYRO, DB_NAMES, DB_PRST=1,2,4,4,5,6,7,8
+    DB_ID, DB_OFFST, DB_PSTNM, DB_PRNT, DB_RGN, DB_VWO, DB_LYRO, DB_NAMES, DB_PRST=1,2,4,5,5,5,6,7,8
     -- DB_ID, DB_OFFST, DB_W, DB_H, DB_VWO, DB_LYRO, DB_NAMES, DB_PRST + n
     -- DB_X, DB_Y, DB_W, DB_RGN + n
     DB_X, DB_Y, DB_W, DB_H, DB_SRC, DB_DEF, DB_OVR=1,2,3,4,5,6,7
@@ -721,7 +735,7 @@ if Controls then
     --   [cluster_id] = {
     --     id, offset, width, height, layer_offset, videowall_offset, names[]
     --     [preset_id] = {
-    --       offset_x, offset_y, collumns, preset_name
+    --       offset_x, offset_y, collumns, preset_name, preset_inheritance
     --       [region_id] = {
     --         x, y, w, h, source, default, (override) -- override is should not be saved to the DB
     -- } } } }
@@ -781,7 +795,7 @@ if Controls then
         end
     end
     function db_read(i, data)
-        DB[i]=eval(data)
+        res, err = pcall(function() DB[i]=eval(data) end)
         if DB[i] and type(DB[i]) == 'table' then return true
         else DB[i]={[DB_ID]=i,[DB_OFFST]=0} return false end
     end
@@ -949,7 +963,8 @@ if Controls then
             local pw=RENDER_ID[Controls['Panel Divisions'].String] or 28
             local name = Controls['Preset Pretty'].String
             if linked then name=shorten_name(name, 4) else name=shorten_name(name, 12) end
-            local data={[DB_X]=dx, [DB_Y]=dy, [DB_W]=pw, [DB_PSTNM]=name}
+            local cur_parent = PRESETS_ID[Controls['Preset Inheritance'].String]
+            local data={[DB_X]=dx, [DB_Y]=dy, [DB_W]=pw, [DB_PSTNM]=name, [DB_PRNT]=cur_parent}
             if name == '' or name == ' ' or name == '0' then data[DB_PSTNM]=nil end
             for r=1, REGIONS do
                 if (Controls['Region X'][r].String ~= '' and Controls['Region Y'][r].String ~= '' and
@@ -1030,15 +1045,18 @@ if Controls then
     end
     function set_preset_choices(num_presets)
         local preset_choices={}
+        local inheritance_choices={'No Parent'}
         for i=1, num_presets do
             local name = (DB[Controls['Editing Cluster'].Value][DB_PRST+i]or{})[DB_PSTNM]
             if name then name = i..' '..name else name = 'Preset '..i end
             table.insert(preset_choices, name)
+            table.insert(inheritance_choices, name)
             PRESETS_ID[name]=i
         end
         table.insert(preset_choices, 'Add Preset')
         PRESETS_ID['Add Preset']=num_presets + 1
         Controls['Select Preset'].Choices=preset_choices
+        Controls['Preset Inheritance'].Choices=inheritance_choices
     end
     function set_screen_choices(cluster_id, num_screens, num_presets, current)
         local screen_choices={}
@@ -1129,11 +1147,22 @@ if Controls then
         local keys={[DB_X]='X', [DB_Y]='Y', [DB_W]='Width', [DB_H]='Height', [DB_SRC]='Source', [DB_DEF]='Default'}
         local num_presets=get_floor_ctrl(cluster_ctrl('Number of Presets', cluster_id))
         local num_screens=get_floor_ctrl(cluster_ctrl('Number of Screens', cluster_id))
-        local offset=DB[cluster_id][DB_OFFST] or 0
+        local cur_db = DB[cluster_id]
+        local offset=cur_db[DB_OFFST] or 0
         local data={}
         local label='STB'
         if preset_id == 0 then label='Screen' end
-        if DB[cluster_id] and DB[cluster_id][DB_PRST+preset_id] then data=DB[cluster_id][DB_PRST+preset_id] end
+        if cur_db then
+            if cur_db[DB_PRST+preset_id] then 
+                data=cur_db[DB_PRST+preset_id]
+                if data[DB_PRNT] and data[DB_PRNT] ~= 0 then
+                    local name = (cur_db[DB_PRST+data[DB_PRNT]]or{})[DB_PSTNM]
+                    Controls['Preset Inheritance'].String=name or 'No Parent'
+                else
+                    Controls['Preset Inheritance'].String='No Parent'
+                end
+            end
+        end
         local name = data[DB_PSTNM] or ''
         if linked then name=shorten_name(name, 4) else name=shorten_name(name, 12) end
         Controls['Preset Pretty'].String=name
@@ -1308,10 +1337,8 @@ if Controls then
         Controls['Select Cluster'].EventHandler=videowall_select_cluster
         Controls['Select Preset'].EventHandler=videowall_select_preset
         Controls['Panel Divisions'].Choices={'28 Divisions (7,4,2)', '30 Divisions (6,5,3,2)'}
-        Controls['Panel Divisions'].EventHandler=save_preset_to_db
-        Controls['Preset Pretty'].EventHandler=save_preset_to_db
-        Controls['Videowall Source Offset'].EventHandler=save_preset_to_db
-        Controls['Videowall Layer Offset'].EventHandler=save_preset_to_db
+        local videowall_actions= {'Panel Divisions', 'Preset Pretty', 'Videowall Source Offset', 'Videowall Layer Offset', 'Preset Inheritance'}
+        for _, s in pairs(videowall_actions) do Controls[s].EventHandler=save_preset_to_db end
 
         for i, ctrl in pairs(Controls['Source Pretty']) do ctrl.EventHandler=function() save_source_pretty_to_db(i, ctrl) end end
         -- Videowall -> Preset: Region X, Y, Width, Height, Source, Default
@@ -1527,11 +1554,12 @@ if Controls then
         if not cluster_id then cluster_id=current_cluster_floored('Cluster Id') end
         local preset_id=i -- If preset is > 0 then ON command if not then save current as negative
         local num_presets=cluster_ctrl('Number of Presets', cluster_id).Value
+        local data=DB[cluster_id][DB_PRST+i] or {}
+        if data[DB_PRNT] and data[DB_PRNT] ~= 0 then preset_id=data[DB_PRNT] end
         if preset_id > num_presets then return end
         if preset_id > 0 then Controls['Active Preset'][cluster_id].Value=preset_id
         else Controls['Active Preset'][cluster_id].Value=-math.abs(Controls['Active Preset'][cluster_id].Value) end
 
-        local data=DB[cluster_id][DB_PRST+i]
         local offset=DB[cluster_id][DB_OFFST] or 0
         if data then -- Load defaults for the preset
             for r=1, REGIONS do
@@ -1574,7 +1602,7 @@ if Controls then
         local preset = math.abs(Controls['Active Preset'][cluster_id].Value)
         if preset == 0 then return 1 end
         local region = Controls['Current Panel'].Value
-        local data = DB[cluster_id][DB_PRST + preset][DB_RGN + region]
+        local data = (DB[cluster_id][DB_PRST + preset] or {})[DB_RGN + region] or {}
         local screen = data[DB_OVR] or data[DB_SRC] or region
         if screen < 1 then screen = math.abs(data[DB_SRC] or region) end
         return math.floor(screen + offset)
@@ -1670,16 +1698,17 @@ if Controls then
     function show_interface(index)
         if index == nil then index=INT_CLUSTER end
         if Controls['Current Navigation'].Value ~= 0 then
+            local cluster_id=current_cluster_floored('Cluster Id')
+            if cluster_id == 0 and CLUSTERS == 1 then cluster_id = 1
+                Controls['Current Cluster'].Value = find_matching_custer_id(1, 0)
+            end
+            if not DB[cluster_id] then index=INT_HOME end
             Controls['Current Navigation'].Value=index
             local vis={['HOME']=(index==INT_HOME and CLUSTERS>1), ['CLUSTER']=(index==INT_CLUSTER), ['CLUSTER28']=false, ['CLUSTER30']=false,
                         ['PRESETS']=(index==INT_PRESET),['MACROS']=(index==INT_MACRO), ['CONTROLS']=(index==INT_CTRLS),
                         ['FOXCTRL']=(index==INT_FOX), ['VWSOURCE']=(index==INT_VW_SRC), ['SETTINGS']=(index==INT_SETTINGS), ['NAVIGATION']=true}
             dbg(DG_FN, 'SHOW SCREEN '..index)
             dbg(DG_DG, tbl_dump(vis))
-            local cluster_id=current_cluster_floored('Cluster Id')
-            if cluster_id == 0 and CLUSTERS == 1 then cluster_id = 1
-                Controls['Current Cluster'].Value = find_matching_custer_id(1, 0)
-            end
             local cluster_name=string.gsub(current_cluster_floored('Cluster Name'), "\\n", "\n")
             local num_presets=current_cluster_floored('Number of Presets')
             local hide=Properties['Hide off control'].Value
@@ -1929,6 +1958,10 @@ if Controls then
                 for i=1, clusters do cluster_on_off(true, i) end
             elseif ctrl.String == 'End of Day' then                               -- End of Day command
                 for i=1, clusters do cluster_on_off(false, i) end
+            elseif ctrl.String == 'Refresh' then
+                QueueTimer=nil -- QUEUE INIT STUFF
+                QUEUE={{},{},{}}
+                for q in pairs(QUEUE) do QUEUE[q].start=queue_start QUEUE[q].stop=queue_stop end
             elseif ctrl.String == 'Random Channels' then                          -- Random channels command
                 instant_clear = true
                 for s, _ in pairs(Controls['Screen CMD']) do
@@ -2000,7 +2033,7 @@ if Controls then
                 local cluster=tonumber(strip_val('[Ss]etup=%d+', ctrl.String, 6))
                 run_regions_setup(cluster)
             elseif string.find(ctrl.String, '[Ss]creen=0') or string.find(ctrl.String, '[Ss]creen=%d+-%d+') then
-                local start, finish = example:match("[Ss]creen=(%d+)-(%d+)")
+                local start, finish = string.match(ctrl.String, "[Ss]creen=(%d+)-(%d+)")
                 if start and finish then start, finish = tonumber(start), tonumber(finish) end
                 if string.find(ctrl.String, 'RESCAN') then
                     for s, _ in pairs(Controls['Screen CMD']) do
@@ -2027,7 +2060,7 @@ if Controls then
                     queue_add(QUEUE[QUE_STB], {screen, ctrl.String})
                 end
             elseif string.find(ctrl.String, '[Cc]luster=0') or string.find(ctrl.String, '[Cc]luster=%d+-%d+') then
-                local start, finish = example:match("[Cc]luster=(%d+)-(%d+)")
+                local start, finish = string.match(ctrl.String, "[Ss]creen=(%d+)-(%d+)")
                 if start and finish then start, finish = tonumber(start), tonumber(finish) end
                 if string.find(ctrl.String, '[Pp]reset=') then
                     local preset=tonumber(strip_val('[Pp]reset=%d+', ctrl.String, 7))
@@ -2165,14 +2198,24 @@ if Controls then
         for i, ctrl in pairs(Controls['Source']) do ctrl.EventHandler=function() override_region(i) end end
         for i, ctrl in pairs(Controls['Preset']) do ctrl.EventHandler=function() select_preset(i) end end
         for i, ctrl in pairs(Controls['Stb Macro']) do
-            local invisible=Controls['Macro Class'][i].String == ' '
+            local cls = Controls['Macro Class'][i].String
+            local invisible=cls == ' '
+            local normal = table.contains(FTA_CLS, cls) or table.contains(MOD_CLS, cls)
             ctrl.IsInvisible=invisible
             ctrl.EventHandler=function() screen_macros(i) end
-            if not invisible then 
+            if normal and not invisible then
                 if not pcall(function()
-                    ctrl.CssClass='btn '..Controls['Macro Class'][i].String
+                    ctrl.Legend=''
+                    ctrl.CssClass='btn '..cls
                 end ) then
-                    ctrl.Legend=Controls['Macro Class'][i].String
+                    ctrl.Legend=cls
+                end
+            elseif not invisible then
+                if not pcall(function()
+                    ctrl.Legend=cls
+                    ctrl.CssClass='btn'
+                end ) then
+                    ctrl.Legend=cls
                 end
             end
         end
