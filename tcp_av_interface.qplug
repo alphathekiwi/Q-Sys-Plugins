@@ -648,7 +648,7 @@ if Controls then
     end
     function queue_start()
         local speed = 0.1 * Properties['Cmd Output Speed'].Value
-        dbg(DG_FN, 'queue_start with speed: ', speed)
+        dbg(DG_FN, 'queue_start with speed: '..speed)
         QueueTimer=Timer.New()
         QueueTimer.EventHandler=queue_exec
         QueueTimer:Start(speed)
@@ -1337,6 +1337,33 @@ if Controls then
         end
         Controls['Select Cluster'].Choices=CLSTR_NAME
     end
+    function preview_to_output()
+        local cluster_id=Controls['Editing Cluster'].Value
+        local preset_id=Controls['Editing Preset'].Value
+        if cluster_id < 1 then return end
+        if cluster_linked(cluster_id) then
+            local dir = Properties['Link Clusters Direction'].Value
+            local odd, even = (cluster_id - (1 - cluster_id%2)), (cluster_id + cluster_id%2)
+            local o_vwo, e_vwo = DB[odd][DB_VWO], DB[even][DB_VWO]
+            local o_lyro, e_lyro = DB[odd][DB_LYRO], DB[even][DB_LYRO]
+            local o_w, o_h, e_w, e_h = DB[odd][DB_W], DB[odd][DB_H], DB[even][DB_W], DB[even][DB_H]
+            local o_preset, e_preset = math.max(0, Controls['Active Preset'][odd].Value), math.max(0, Controls['Active Preset'][even].Value)
+            local o_data, e_data = DB[odd][DB_PRST + o_preset], DB[even][DB_PRST + e_preset]
+            if cluster_id == odd then o_preset = preset_id
+            else e_preset = preset_id end
+            local cmd = 'panel='..cluster_to_panel_id(odd)..', layout={'
+            cmd = presets_to_cmd(cmd, o_preset, o_data, o_w, o_h, o_vwo, o_lyro, e_preset, e_data, e_w, e_h, e_vwo, e_lyro, dir)
+            queue_add(QUEUE[QUE_CLUSTER], cmd)
+        else
+            local width, height = DB[cluster_id][DB_W], DB[cluster_id][DB_H]
+            vwo=vwo or DB[cluster_id][DB_VWO] or 0
+            lyro=lyro or DB[cluster_id][DB_LYRO] or 0
+            local p_data=DB[cluster_id][DB_PRST + preset_id]
+            local cmd='panel='..cluster_id..', layout={'
+            cmd = preset_to_cmd(cmd, preset_id, p_data, width, height, vwo, lyro)
+            queue_add(QUEUE[QUE_CLUSTER], cmd)
+        end
+    end
     function designer_init()
         -- Videowalls
         Controls['Editing Cluster'].Value=0
@@ -1381,6 +1408,7 @@ if Controls then
                 setup_cluster_screens(c, cluster_id, Controls['Number of Presets'][i].Value) 
                 recalculate_offsets() end
             Controls['Number of Presets'][i].EventHandler=function(c) setup_cluster_presets(c, i, cluster_id) end
+            Controls['VideowallRender'].EventHandler=preview_to_output
         end setup_cluster_name()
 
         -- Setup -> Macro: Class, Channel
@@ -1837,9 +1865,10 @@ if Controls then
     end
     function presets_to_cmd(cmd, o_preset, o_data, o_w, o_h, o_vwo, o_lyro, e_preset, e_data, e_w, e_h, e_vwo, e_lyro, dir)
         local offset_r=0
+        -- dbg(DG_FN, 'presets_to_cmd data not nil: '..tostring(o_data ~= nil)..' preset > 0 '..tostring(o_preset > 0))
         if o_data ~= nil and o_preset > 0 then
             for o_r, o_region in pairs(o_data) do
-                if o_r > DB_RGN and type(data) == 'table' then
+                if o_r > DB_RGN and type(o_region) == 'table' then
                     if dir == 'Even then Odd' then
                         cmd=cmd..region_to_cmd(o_r-DB_RGN+o_lyro, e_w, 0, o_w, o_h, o_region, o_vwo)
                     elseif dir == 'Even above Odd' then
@@ -1851,9 +1880,10 @@ if Controls then
                 end
             end
         end
+        -- dbg(DG_FN, 'presets_to_cmd data not nil: '..tostring(e_data ~= nil)..' preset > 0 '..tostring(e_preset > 0))
         if e_data ~= nil and e_preset > 0 then
             for e_r, e_region in pairs(e_data) do
-                if e_r > DB_RGN and type(data) == 'table' then
+                if e_r > DB_RGN and type(e_region) == 'table' then
                     if dir == 'Odd then Even' then
                         cmd=cmd..region_to_cmd(offset_r+e_r-DB_RGN+e_lyro, o_w, 0, e_w, e_h, e_region, e_vwo)
                     elseif dir == 'Odd above Even' then
@@ -1893,7 +1923,6 @@ if Controls then
                         if o_i == 0 then name = name..'off ' else name = name..(o_p[DB_PSTNM] or o_i)..' ' end
                         if e_i == 0 then name = name..'off' else name = name..(e_p[DB_PSTNM] or e_i) end
                         local cmd='panel='..cluster_to_panel_id(i)..', setup='..id..', name='..name..', regions={'
-                        -- cmd=presets_to_cmd(cmd, o_i, o_p, width, height, o_vwo, e_i, e_p, width2, height2, e_vwo, dir)
                         cmd=presets_to_cmd(cmd, o_preset, o_data, o_w, o_h, o_vwo, o_lyro, e_preset, e_data, e_w, e_h, e_vwo, e_lyro, dir)
                         queue_add(QUEUE[QUE_CLUSTER], cmd)
                 end end
@@ -1972,7 +2001,7 @@ if Controls then
                 for i=1, clusters do cluster_on_off(true, i) end
             elseif ctrl.String == 'End of Day' then                               -- End of Day command
                 for i=1, clusters do cluster_on_off(false, i) end
-            elseif ctrl.String == 'Refresh' then
+            elseif ctrl.String == 'Reset' or ctrl.String == 'Refresh' then        -- Resets the cmd queue
                 QueueTimer=nil -- QUEUE INIT STUFF
                 QUEUE={{},{},{}}
                 for q in pairs(QUEUE) do QUEUE[q].start=queue_start QUEUE[q].stop=queue_stop end
@@ -1986,20 +2015,23 @@ if Controls then
                     Controls['Active StbChn'][s].Value=tonumber(chn)
                     queue_add(QUEUE[QUE_STB], {s, 'macro='..chn})
                 end
-            elseif ctrl.String == 'Preset Step' then                             -- Log Preset Matrix command
+            elseif ctrl.String == 'Preset Step' then                              -- Log Preset Matrix command
                 instant_clear = true
                 local cluster_id, preset_id, e_preset = PRESET_STEP[INT_CLUSTER], PRESET_STEP[INT_PRESET], PRESET_STEP[INT_PRESET+1]
                 local num_presets=cluster_ctrl('Number of Presets', cluster_id).Value
                 local go_next_cluster = false
-                if cluster_linked(cluster_id) and i % 2 == 0 then go_next_cluster = true
-                elseif cluster_linked(cluster_id) and i % 2 == 1 and DB[cluster_id+1] then
+                if cluster_linked(cluster_id) and cluster_id % 2 == 0 then go_next_cluster = true
+                elseif cluster_linked(cluster_id) and cluster_id % 2 == 1 and DB[cluster_id+1] then
                     local dir = Properties['Link Clusters Direction'].Value
-                    local odd, even = (cluster_id - (1 - cluster_id%2)), (cluster_id + cluster_id%2)
-                    local o_vwo, e_vwo = DB[odd][DB_VWO], DB[even][DB_VWO]
-                    local o_lyro, e_lyro = DB[odd][DB_LYRO], DB[even][DB_LYRO]
-                    local o_w, o_h, e_w, e_h = DB[odd][DB_W], DB[odd][DB_H], DB[even][DB_W], DB[even][DB_H]
-                    local o_data, e_data = DB[odd][DB_PRST + preset_id], DB[even][DB_PRST + e_preset]
-                    local cmd = 'panel='..cluster_to_panel_id(odd)..', layout={'
+                    local even = cluster_id + 1
+                    local o_vwo, e_vwo = DB[cluster_id][DB_VWO], DB[even][DB_VWO]
+                    local o_lyro, e_lyro = DB[cluster_id][DB_LYRO], DB[even][DB_LYRO]
+                    local o_w, o_h, e_w, e_h = DB[cluster_id][DB_W], DB[cluster_id][DB_H], DB[even][DB_W], DB[even][DB_H]
+                    local o_data, e_data = DB[cluster_id][DB_PRST + preset_id], DB[even][DB_PRST + e_preset]
+                    local cmd = 'panel='..cluster_to_panel_id(cluster_id)..', layout={'
+                    -- dbg(DG_RX, 'prest_id='..preset_id..' o_data='..tbl_dump(o_data)..' e_preset='..e_preset..' e_data='..tbl_dump(e_data))
+                    -- dbg(DG_RX, 'o_w='..o_w..' o_h='..o_h..' e_w='..e_w..' e_h='..e_h..' o_vwo='..o_vwo..' o_lyro='..o_lyro..' e_vwo='..e_vwo..' e_lyro='..e_lyro)
+                    -- presets_to_cmd(cmd, o_preset, o_data, o_w, o_h, o_vwo, o_lyro, e_preset, e_data, e_w, e_h, e_vwo, e_lyro, dir)
                     cmd = presets_to_cmd(cmd, preset_id, o_data, o_w, o_h, o_vwo, o_lyro, e_preset, e_data, e_w, e_h, e_vwo, e_lyro, dir)
                     queue_add(QUEUE[QUE_CLUSTER], cmd)
                     if preset_id < num_presets then
@@ -2020,6 +2052,7 @@ if Controls then
                         PRESET_STEP[INT_PRESET] = preset_id + 1
                     else go_next_cluster = true end
                 end
+                -- dbg(DG_RX, 'cluster='..cluster_id..' preset='..preset_id..' e_preset='..e_preset)
                 if go_next_cluster then
                     while cluster_id < clusters and cluster_ctrl('Number of Presets', cluster_id+1).Value == 0 do
                         cluster_id = cluster_id + 1

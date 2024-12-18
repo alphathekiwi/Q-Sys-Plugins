@@ -228,8 +228,9 @@ if Controls then
         local base_cmd = '\n{\n\t"cmd":"W0603",\n\t"deviceId":%s,\n\t"screenId":%d,\n\t"presetId":%d\n}'
         return string.format(base_cmd, Controls['Device ID'].String, screen_id, check_number(preset_id, 0, 0, 255))
     end
-    function cmd_open_layer(screen_id, layer_id, x,y,w,h, source, name)
-        local o_x, o_y = get_offset(screen_id)
+    function cmd_open_layer(db_id, screen_id, layer_id, x,y,w,h, source, name)
+        print(db_id, screen_id, layer_id, x,y,w,h, source, name)
+        local o_x, o_y = get_offset(db_id)
         local general ='"general":{\n\t\t"layerId":'..layer_id..',\n\t\t"name":"'..name..'",\n\t\t"sizeType":0,\n\t\t"type":1,\n\t\t"isBackground":false,\n\t\t"isFreeze":false,\n\t\t"flipType":0\n\t}'
         local source = '"source":{\n\t\t"sourceType":1,\n\t\t"inputId":'..source..',\n\t\t"interfaceType":1,\n\t\t"cropId":255\n\t}'
         local window = string.format('"window":{\n\t\t"width":%d,\n\t\t"height":%d,\n\t\t"x":%d,\n\t\t"y":%d\n\t}', w, h, o_x+x, o_y+y)
@@ -254,22 +255,22 @@ if Controls then
         end
         return string.gsub(close_cmd, '},$', '}')
     end
-    function open_all_layers(screen_id, regions)
+    function open_all_layers(db_id, screen_id, regions)
         local open_cmd = ''
         for i, region in pairs(regions) do
             local name = 'Region '..i..' HDMI '..region[DB_SRC]
-            open_cmd = open_cmd..cmd_open_layer(screen_id, i-1, region[DB_X], region[DB_Y], region[DB_W], region[DB_H], region[DB_SRC]-1, name)..','
+            open_cmd = open_cmd..cmd_open_layer(db_id, screen_id, i-1, region[DB_X], region[DB_Y], region[DB_W], region[DB_H], region[DB_SRC]-1, name)..','
         end
         return open_cmd
     end
-    function load_layout(screen_id, regions)
+    function load_layout(db_id, screen_id, regions)
         queue_add(QUEUE, close_all_layers(screen_id))
-        local open_cmd = open_all_layers(screen_id, regions)
+        local open_cmd = open_all_layers(db_id, screen_id, regions)
         queue_add(QUEUE, string.gsub(open_cmd, '},$', '}'))
     end
-    function save_preset(screen_id, regions, preset_id, preset_name)
+    function save_preset(db_id, screen_id, regions, preset_id, preset_name)
         queue_add(QUEUE, close_all_layers(screen_id))
-        local open_cmd = open_all_layers(screen_id, regions)
+        local open_cmd = open_all_layers(db_id, screen_id, regions)
         local save_cmd = '\n{\n\t"cmd":"W0602",\n\t"deviceId":%s,\n\t"screenId":%d,\n\t"presetId":%d, \n\t"name":"%s"\n}'
         open_cmd = open_cmd..string.format(save_cmd, Controls['Device ID'].String, screen_id, check_number(preset_id, 0, 0, 255), preset_name)
         queue_add(QUEUE, open_cmd)
@@ -348,13 +349,14 @@ if Controls then
                 dbg(DG_FN, 'Set Brightness '..level)
             elseif string.find(data, "[Ll]ayout=") then
                 local layout = eval(strip_val('[Ll]ayout=[^&]+', data, 7))
-                load_layout(screen_id, layout)
+                adjusted_id, _ = adjust_for_grouping(screen_id, 0)
+                load_layout(screen_id+1, adjusted_id, layout)
                 dbg(DG_FN, 'Load Layout')
             elseif string.find(data, "[Ll]ayer=") then
                 local layer = tonumber(strip_val('[Ll]ayer=%d+', data, 6)) or 0
                 local source = tonumber(strip_val('[Ss]ource=%d+', data, 7)) or 0
                 local crop_id = tonumber(strip_val('[Cc]rop=%d+', data, 5)) or 255
-                screen_id, _ = adjust_for_grouping(screen_id, 0)
+                adjusted_id, _ = adjust_for_grouping(screen_id, 0)
                 if not string.find(data, "[Cc]rop=") then crop_id = 255 end
                 send_udp_data(cmd_change_souce(screen_id, layer, source, crop_id))
                 dbg(DG_FN, 'Change Source for '.. layer..' to '..source)
@@ -366,7 +368,8 @@ if Controls then
                 local preset_id = strip_val('[Ss]etup=%d+', data, 6)
                 local name = strip_val('[Nn]ame=[^,]+', data, 5)
                 local layout = eval(strip_val('[Rr]egions=[^&]+', data, 8))
-                save_preset(screen_id, layout, preset_id, name)
+                adjusted_id, _ = adjust_for_grouping(screen_id, 0)
+                save_preset(screen_id+1, adjusted_id, layout, preset_id, name)
                 dbg(DG_FN, 'Save Preset '..name)
             elseif string.find(data, "[Cc]lear_[Pp]resets") then
                 local num_presets = strip_val('[Cc]lear_[Pp]resets=%d+', data, 14)
