@@ -1898,11 +1898,8 @@ if Controls then
     end
     function run_regions_setup(i)
         local num_presets=cluster_ctrl('Number of Presets', i).Value
-        local num_screens=cluster_ctrl('Number of Screens', i).Value
-        local cluster_name = cluster_ctrl('Cluster Name', i).String
         local dir = Properties['Link Clusters Direction'].Value
         local linked = cluster_linked(i)
-        cluster_name = string.gsub(cluster_name, "\\n", " ")
         local o_vwo=DB[i][DB_VWO]
         local o_lyro=DB[i][DB_LYRO]
         if num_presets > 0 and DB[i] then
@@ -1939,6 +1936,12 @@ if Controls then
                 end 
             end
         end
+    end
+    function run_names_setup(i)
+        local num_screens=cluster_ctrl('Number of Screens', i).Value
+        local cluster_name = cluster_ctrl('Cluster Name', i).String
+        local linked = cluster_linked(i)
+        cluster_name = string.gsub(cluster_name, "\\n", " ")
         local offset=DB[i][DB_OFFST] or 0
         if (linked and i % 2 == 1) or not linked then
             local ip = check_ip(Controls['Starting IP'].String)
@@ -2071,14 +2074,19 @@ if Controls then
                     log_string = log_preset_matrix(i, log_string)
                 end
                 print(log_string)
-            elseif ctrl.String == 'Setup' then                                    -- Setup command
+            elseif ctrl.String == 'Send Presets' then                            -- Setup command
                 instant_clear = true
                 for i=1, clusters do
                     run_regions_setup(i)
                 end
+            elseif ctrl.String == 'Setup' then                                    -- Setup command
+                instant_clear = true
+                for i=1, clusters do
+                    run_names_setup(i)
+                end
             elseif string.find(ctrl.String, '[Ss]etup=') then                     -- Setup for specific cluster
                 local cluster=tonumber(strip_val('[Ss]etup=%d+', ctrl.String, 6))
-                run_regions_setup(cluster)
+                run_names_setup(cluster)
             elseif string.find(ctrl.String, '[Ss]creen=0') or string.find(ctrl.String, '[Ss]creen=%d+-%d+') then
                 local start, finish = string.match(ctrl.String, "[Ss]creen=(%d+)-(%d+)")
                 if start and finish then start, finish = tonumber(start), tonumber(finish) end
