@@ -337,10 +337,9 @@ if Controls then
         local data = ctrl.String
         local p,s = strip_val('[Pp]anel=%d+', data, 6), strip_val('[Ss]creen=%d+', data, 7)
         local screen_id = matches_cluster_id(p+s)
+        local adjusted_id, preset_id = adjust_for_grouping(screen_id, strip_val('[Pp]reset=%d+', data, 7))
         if screen_id > -1 then
             if string.find(data, "[Pp]reset=") then
-                local preset_id = strip_val('[Pp]reset=%d+', data, 7)
-                screen_id, preset_id = adjust_for_grouping(screen_id, preset_id)
                 send_udp_data(cmd_load_preset(screen_id, preset_id))
                 dbg(DG_FN, 'Load Preset '..preset_id)
             elseif string.find(data, "[Bb]rightness=") then
@@ -349,17 +348,29 @@ if Controls then
                 dbg(DG_FN, 'Set Brightness '..level)
             elseif string.find(data, "[Ll]ayout=") then
                 local layout = eval(strip_val('[Ll]ayout=[^&]+', data, 7))
-                adjusted_id, _ = adjust_for_grouping(screen_id, 0)
                 load_layout(screen_id+1, adjusted_id, layout)
                 dbg(DG_FN, 'Load Layout')
             elseif string.find(data, "[Ll]ayer=") then
                 local layer = tonumber(strip_val('[Ll]ayer=%d+', data, 6)) or 0
                 local source = tonumber(strip_val('[Ss]ource=%d+', data, 7)) or 0
                 local crop_id = tonumber(strip_val('[Cc]rop=%d+', data, 5)) or 255
-                adjusted_id, _ = adjust_for_grouping(screen_id, 0)
                 if not string.find(data, "[Cc]rop=") then crop_id = 255 end
                 send_udp_data(cmd_change_souce(screen_id, layer, source, crop_id))
                 dbg(DG_FN, 'Change Source for '.. layer..' to '..source)
+            elseif string.find(data, "[Rr]esize=") then
+                local layer = tonumber(strip_val('[Rr]esize=%d+', data, 7)) or 0
+                local source = tonumber(strip_val('[Ss]ource=%d+', data, 7)) or 0
+                local crop_id = tonumber(strip_val('[Cc]rop=%d+', data, 5)) or 255
+                local loc_x = tonumber(strip_val('X=%d+', data, 2)) or 12
+                local loc_y = tonumber(strip_val('Y=%d+', data, 2)) or 12
+                local width = tonumber(strip_val('W=%d+', data, 2)) or 1920
+                local height = tonumber(strip_val('H=%d+', data, 2)) or 1080
+                if not string.find(data, "[Cc]rop=") then crop_id = 255 end
+                queue_add(QUEUE, cmd_close_layer(adjusted_id, layer))
+                queue_add(QUEUE, cmd_open_layer(screen_id+1, adjusted_id, layer, loc_x, loc_y, width, height, source, 'PiP'))
+            elseif string.find(data, "[Cc]lose=") then
+                local layer = tonumber(strip_val('[Cc]lose=%d+', data, 6)) or 0
+                send_udp_data(cmd_close_layer(screen_id, layer))
             end
 
             -- Manual Setup will terminate parsing here if enabled
@@ -368,7 +379,6 @@ if Controls then
                 local preset_id = strip_val('[Ss]etup=%d+', data, 6)
                 local name = strip_val('[Nn]ame=[^,]+', data, 5)
                 local layout = eval(strip_val('[Rr]egions=[^&]+', data, 8))
-                adjusted_id, _ = adjust_for_grouping(screen_id, 0)
                 save_preset(screen_id+1, adjusted_id, layout, preset_id, name)
                 dbg(DG_FN, 'Save Preset '..name)
             elseif string.find(data, "[Cc]lear_[Pp]resets") then
