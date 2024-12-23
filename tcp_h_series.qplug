@@ -345,32 +345,32 @@ if Controls then
         local screen_id = matches_cluster_id(p+s)
         local adjusted_id, preset_id = adjust_for_grouping(screen_id, strip_val('[Pp]reset=%d+', data, 7))
         if screen_id > -1 then
-            if string.find(data, "[Pp]reset=") then
+            if string.find(data, "[Pp]reset=") then -- Change preset
                 send_udp_data(cmd_load_preset(screen_id, preset_id))
                 dbg(DG_FN, 'Load Preset '..preset_id)
             elseif string.find(data, "[Bb]rightness=") then
                 local level = strip_val('[Bb]rightness=%d+', data, 11)
                 send_udp_data(cmd_set_brightness(screen_id, level))
                 dbg(DG_FN, 'Set Brightness '..level)
-            elseif string.find(data, "[Ll]ayout=") then
+            elseif string.find(data, "[Ll]ayout=") then -- Load Layout
                 local layout = eval(strip_val('[Ll]ayout=[^&]+', data, 7))
                 load_layout(screen_id+1, adjusted_id, layout)
                 dbg(DG_FN, 'Load Layout')
-            elseif string.find(data, "[Ll]ayer=") then
+            elseif string.find(data, "[Ll]ayer=") then -- Change Source for given Layer
                 local layer = tonumber(strip_val('[Ll]ayer=%d+', data, 6)) or 0
                 local source = tonumber(strip_val('[Ss]ource=%d+', data, 7)) or 0
                 local crop_id = tonumber(strip_val('[Cc]rop=%d+', data, 5)) or 255
                 if not string.find(data, "[Cc]rop=") then crop_id = 255 end
                 send_udp_data(cmd_change_souce(screen_id, layer, source, crop_id))
                 dbg(DG_FN, 'Change Source for '.. layer..' to '..source)
-            elseif string.find(data, "[Rr]esize=") then
+            elseif string.find(data, "[Rr]esize=") then -- Resize Layer
                 local layer = tonumber(strip_val('[Rr]esize=%d+', data, 7)) or 0
                 local loc_x = tonumber(strip_val('X=%d+', data, 2)) or 12
                 local loc_y = tonumber(strip_val('Y=%d+', data, 2)) or 12
                 local width = tonumber(strip_val('W=%d+', data, 2)) or 1920
                 local height = tonumber(strip_val('H=%d+', data, 2)) or 1080
                 queue_add(QUEUE, cmd_resize_layer(screen_id+1, adjusted_id, layer, loc_x, loc_y, width, height))
-            elseif string.find(data, "[Oo]pen=") then
+            elseif string.find(data, "[Oo]pen=") then   -- Open Layer
                 local layer = tonumber(strip_val('[Oo]pen=%d+', data, 5)) or 0
                 local source = tonumber(strip_val('[Ss]ource=%d+', data, 7)) or 0
                 local crop_id = tonumber(strip_val('[Cc]rop=%d+', data, 5)) or 255
@@ -381,7 +381,7 @@ if Controls then
                 if not string.find(data, "[Cc]rop=") then crop_id = 255 end
                 queue_add(QUEUE, cmd_close_layer(screen_id, layer))
                 queue_add(QUEUE, cmd_open_layer(screen_id+1, adjusted_id, layer, loc_x, loc_y, width, height, source, 'Layer '..layer))
-            elseif string.find(data, "[Cc]lose=") then
+            elseif string.find(data, "[Cc]lose=") then  -- Close Layer
                 local layer = tonumber(strip_val('[Cc]lose=%d+', data, 6)) or 0
                 send_udp_data(cmd_close_layer(screen_id, layer))
             end
@@ -434,8 +434,7 @@ if Controls then
             if System.IsEmulating then Controls['Brightness'].Value = 255 end
             Controls['Brightness'].EventHandler = function(c) send_udp_data(cmd_set_brightness(0, c.Value)) end
             Controls['Current Preset'].EventHandler = function(c)
-                local screen_id, preset_id = adjust_for_grouping(i-1, c.Value)
-                send_udp_data(cmd_load_preset(screen_id, preset_id))
+                send_udp_data(cmd_load_preset(0, c.Value))
             end
         end
         UDP_SOCK = UdpSocket.New()
