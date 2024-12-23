@@ -246,6 +246,12 @@ if Controls then
         local base_cmd = '\n{\n\t"cmd":"W0506",\n\t"interfaceType":1,\n\t"deviceId":%s,\n\t"screenId":%d,\n\t"layerId":%d,\n\t"inputId":%d,\n\t"cropId":%d\n}'
         return string.format(base_cmd, Controls['Device ID'].String, screen_id, check_number(layer_id, 0, 0, 255), check_number(input_id, 0, 0, 255), check_number(crop_id, 255, 0, 255))
     end
+    -- [{"cmd":"W0505","screenId":0,"deviceId":0,"layerId":0,"width":100,"height":100,"x":100,"y":100}]
+    function cmd_resize_layer(db_id, screen_id, layer_id, x, y, w, h)
+        local o_x, o_y = get_offset(db_id)
+        local base_cmd = '\n{\n\t"cmd":"W0505",\n\t"deviceId":%s,\n\t"screenId":%d,\n\t"layerId":%d,\n\t"width":%d,\n\t"height":%d,\n\t"x":%d,\n\t"y":%d\n}'
+        return string.format(base_cmd, Controls['Device ID'].String, screen_id, check_number(layer_id, 0, 0, 255), w, h, o_x+x, o_y+y)
+    end
     -- MULTI STEP COMMANDS
     function close_all_layers(screen_id)
         local close_cmd = '' 
@@ -359,6 +365,13 @@ if Controls then
                 dbg(DG_FN, 'Change Source for '.. layer..' to '..source)
             elseif string.find(data, "[Rr]esize=") then
                 local layer = tonumber(strip_val('[Rr]esize=%d+', data, 7)) or 0
+                local loc_x = tonumber(strip_val('X=%d+', data, 2)) or 12
+                local loc_y = tonumber(strip_val('Y=%d+', data, 2)) or 12
+                local width = tonumber(strip_val('W=%d+', data, 2)) or 1920
+                local height = tonumber(strip_val('H=%d+', data, 2)) or 1080
+                queue_add(QUEUE, cmd_resize_layer(screen_id+1, adjusted_id, layer, loc_x, loc_y, width, height))
+            elseif string.find(data, "[Oo]pen=") then
+                local layer = tonumber(strip_val('[Oo]pen=%d+', data, 5)) or 0
                 local source = tonumber(strip_val('[Ss]ource=%d+', data, 7)) or 0
                 local crop_id = tonumber(strip_val('[Cc]rop=%d+', data, 5)) or 255
                 local loc_x = tonumber(strip_val('X=%d+', data, 2)) or 12
@@ -366,8 +379,8 @@ if Controls then
                 local width = tonumber(strip_val('W=%d+', data, 2)) or 1920
                 local height = tonumber(strip_val('H=%d+', data, 2)) or 1080
                 if not string.find(data, "[Cc]rop=") then crop_id = 255 end
-                queue_add(QUEUE, cmd_close_layer(adjusted_id, layer))
-                queue_add(QUEUE, cmd_open_layer(screen_id+1, adjusted_id, layer, loc_x, loc_y, width, height, source, 'PiP'))
+                queue_add(QUEUE, cmd_close_layer(screen_id, layer))
+                queue_add(QUEUE, cmd_open_layer(screen_id+1, adjusted_id, layer, loc_x, loc_y, width, height, source, 'Layer '..layer))
             elseif string.find(data, "[Cc]lose=") then
                 local layer = tonumber(strip_val('[Cc]lose=%d+', data, 6)) or 0
                 send_udp_data(cmd_close_layer(screen_id, layer))

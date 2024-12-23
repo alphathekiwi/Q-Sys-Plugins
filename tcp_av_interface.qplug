@@ -637,9 +637,9 @@ if Controls then
         queue[first]=nil -- to allow garbage collection
         queue.first=first + 1
         queue.len=queue.len - 1
-        if queue.len < 1 and type(queue.stop) == 'function' then
-            queue:stop()
-        end
+        -- if queue.len < 1 and type(queue.stop) == 'function' then
+        --     queue:stop()
+        -- end
         return value
     end
     function queue_len(queue)

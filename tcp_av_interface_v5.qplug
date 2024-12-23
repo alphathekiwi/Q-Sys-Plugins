@@ -627,9 +627,9 @@ if Controls then
         queue[first]=nil -- to allow garbage collection
         queue.first=first + 1
         queue.len=queue.len - 1
-        if queue.len < 1 and type(queue.stop) == 'function' then
-            queue:stop()
-        end
+        -- if queue.len < 1 and type(queue.stop) == 'function' then
+        --     queue:stop()
+        -- end
         return value
     end
     function queue_len(queue)
@@ -639,6 +639,7 @@ if Controls then
     function queue_start()
         local speed = 0.1 * Properties['Cmd Output Speed'].Value
         dbg(DG_FN, 'queue_start with speed: '..speed)
+        if QueueTimer then pcall(function() QueueTimer:Stop() end ) end
         QueueTimer=Timer.New()
         QueueTimer.EventHandler=queue_exec
         QueueTimer:Start(speed)
