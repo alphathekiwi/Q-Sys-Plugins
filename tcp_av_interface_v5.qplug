@@ -1,5 +1,5 @@
 PluginInfo={
-    Name='AV Interface V5', Version='5.0.0', BuildVersion='0.24.05.07', Id='8bdf6969-9368-0TCP-0AV0-OINTERFACE50', Author='Total Concept Projects', Description='AV Control Interface Plugin\nAaron | alphathekiwi@gmail.com'
+    Name='In Development~AV Interface V5', Version='5.0.0', BuildVersion='0.24.05.07', Id='8bdf6969-9368-0TCP-0AV0-OINTERFACE50', Author='Total Concept Projects', Description='AV Control Interface Plugin\nAaron | alphathekiwi@gmail.com'
 }
 function eval(s) return assert(load('return '..s))() end
 function tbl_dump(o)

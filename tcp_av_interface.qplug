@@ -1,5 +1,5 @@
 PluginInfo={
-    Name='AV Interface V4', Version='4.6.8', BuildVersion='0.24.05.07', Id='8bdf6969-9368-0TCP-0AV0-OINTERFACE00', Author='Total Concept Projects', Description='AV Control Interface Plugin\nAaron | alphathekiwi@gmail.com'
+    Name='AV Interface V4', Version='4.6.9', BuildVersion='0.24.05.07', Id='8bdf6969-9368-0TCP-0AV0-OINTERFACE00', Author='Total Concept Projects', Description='AV Control Interface Plugin\nAaron | alphathekiwi@gmail.com'
 }
 function eval(s) return assert(load('return '..s))() end
 function tbl_dump(o)
@@ -198,6 +198,7 @@ function GetControls(props)
         table.insert(ctrls, {Name='Panels Height', ControlType='Knob', ControlUnit='Integer', Min=0, Max=10800, Count=1})
         table.insert(ctrls, {Name='Preset Quick Regions', ControlType='Text', Count=1})
         table.insert(ctrls, {Name='Preset Inheritance', ControlType='Text', Count=1})
+        table.insert(ctrls, {Name='Screen Labels', ControlType='Text', Count=1})
         table.insert(ctrls, {Name='Panel Divisions', ControlType='Text', Count=1})
         table.insert(ctrls, {Name='Videowall Source Offset', ControlType='Knob', ControlUnit='Integer', Min=-48, Max=48, Count=1})
         table.insert(ctrls, {Name='Videowall Layer Offset', ControlType='Knob', ControlUnit='Integer', Min=-255, Max=255, Count=1})
@@ -354,6 +355,8 @@ function GetControlLayout(props)
 
         layout['Preset Inheritance']={Style='ComboBox', Position={575, 165}, Size={204, 30}, FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
         table.insert(graphics, {Type='Text', Position={575, 145}, Size={204, 20}, Text='Preset Inheritance', FontSize=16, HTextAlign='Center'})
+        layout['Screen Labels']={Style='ComboBox', Position={791, 165}, Size={204, 30}, FontSize=16, Margin=0, Padding=2, StrokeWidth=0}
+        table.insert(graphics, {Type='Text', Position={791, 145}, Size={204, 20}, Text='Screen Labels', FontSize=16, HTextAlign='Center'})
 
         table.insert(graphics, {Type='Text', Text='Custom Names', Position={21, 175}, Size={80, 30}, FontSize=12, HTextAlign='Center'})
         table.insert(graphics, {Type='Text', Text='Source', Position={125, 175}, Size={84, 30}, FontSize=12, HTextAlign='Center'})
@@ -880,10 +883,51 @@ if Controls then
         local b64=quick_draw_regions(p_w, p_h, data, true, true)
         draw_svg(Controls['VideowallRender'], b64)
     end
-    function quick_draw_regions(width, height, regions, preview, hide_name)
+    function name_stb(name, num_presets, screen_id)
+        local label='STB'
+        if num_presets < 2 then label='Screen' end
+        if name == '' or name == " " then name = label..' '..screen_id end
+        return name
+    end
+    function create_labels(cluster_id, num_presets, regions)
+        local labels = {}
+        local mode = Controls["Screen Labels"].String
+        if mode == "None" then return end
+        local names = DB[cluster_id][DB_NAMES] or {}
+        local offset = DB[cluster_id][DB_OFFST] or 0
+        if type(names) ~= 'table' then names={} end
+        print(tbl_dump(names))
+        for i, r in pairs(regions or {}) do
+            if i > DB_RGN then
+                local screen_id = r[DB_SRC] or 0
+                if screen_id > 0 then
+                    local name = names[screen_id] or ''
+                    if mode == "Name" or mode == "Both" then
+                        name = name_stb(name, num_presets, screen_id)
+                        labels[i] = name
+                    end
+                    local chn = ''
+                    if mode == "Channel" or mode == "Both" then
+                        local macro = Controls["Active StbChn"][screen_id + offset] 
+                        if macro then macro = math.floor(macro.Value) end
+                        if macro > 0 then macro = Controls['Macro Channel'][macro].String
+                            if macro and (macro ~= '' or macro ~= ' ') then chn='['..macro..']' end
+                        end
+                        labels[i] = chn
+                    end
+                    if mode == "Both" then
+                        labels[i] = name.." "..chn
+                    end
+                end
+            end
+        end
+        return labels
+    end
+    function quick_draw_regions(width, height, regions, preview, hide_name, labels)
         local doc=nil
         if width==0 and height==0 then width=3072 height=1152 end
         local font_size=math.floor(height/12)
+        local name_size=math.floor(height/20)
         doc=EzSVG.Document(width, height, 'dimgray')
         for i, r in pairs(regions or {}) do
             if i > DB_RGN then
@@ -897,7 +941,16 @@ if Controls then
                     if w <= 1 then w=width * w end
                     if h <= 1 then h=height * h end
                     doc:add(EzSVG.Rect(x, y, w, h))
-                    if preview then
+                    if labels and labels[i] then
+                        doc:add(EzSVG.Text(labels[i], x+(w/2), y+(h/2), {
+                            font_size=name_size,
+                            font_family= "Arial",
+                            text_anchor="middle",
+                            dominant_baseline="middle",
+                            fill= "#222222",
+                            stroke= "black"
+                        }))
+                    elseif preview then
                         doc:add(EzSVG.Text(''..i-DB_RGN, x+(w/2), y+(h/2), {
                             font_size=font_size,
                             font_family= "Arial",
@@ -1378,6 +1431,7 @@ if Controls then
         Controls['Select Cluster'].EventHandler=videowall_select_cluster
         Controls['Select Preset'].EventHandler=videowall_select_preset
         Controls['Panel Divisions'].Choices={'28 Divisions (7,4,2)', '30 Divisions (6,5,3,2)'}
+        Controls['Screen Labels'].Choices={"None", "Name", "Channel", "Both"}
         local videowall_actions= {'Panel Divisions', 'Preset Pretty', 'Videowall Source Offset', 'Videowall Layer Offset', 'Preset Inheritance'}
         for _, s in pairs(videowall_actions) do Controls[s].EventHandler=save_preset_to_db end
 
@@ -1450,9 +1504,12 @@ if Controls then
             else select_preset(0, cluster_id) end
             if redraw then
                 local width, height=(DB[cluster_id][DB_W] or 2048), (DB[cluster_id][DB_H] or 576)
-                if Controls['Active Preset'][cluster_id].Value > 0 then
-                    local regions=DB[cluster_id][DB_PRST + Controls['Active Preset'][cluster_id].Value]
-                    draw_svg(Controls['Render Panel'], quick_draw_regions(width, height, regions, false, false))
+                local preset_id = Controls['Active Preset'][cluster_id].Value
+                if preset_id > 0 then
+                    local regions=DB[cluster_id][DB_PRST + preset_id]
+                    local labels = create_labels(cluster_id, num_presets, regions)
+                    local hide_name = num_presets < 2 or labels ~= nil
+                    draw_svg(Controls['Render Panel'], quick_draw_regions(width, height, regions, false, hide_name, labels))
                 else draw_svg(Controls['Render Panel'], quick_draw_regions(0, 0, {[DB_PSTNM]='Off Preset'}, false, false)) end
             end
         else
@@ -1597,6 +1654,7 @@ if Controls then
         local preset_id=i -- If preset is > 0 then ON command if not then save current as negative
         local num_presets=cluster_ctrl('Number of Presets', cluster_id).Value
         local data=DB[cluster_id][DB_PRST+i] or {}
+        if type(data) ~= "table" then print("No preset "..i.." found for cluster "..cluster_id) return end
         if data[DB_PRNT] and data[DB_PRNT] ~= 0 then preset_id=data[DB_PRNT] end
         if preset_id > num_presets then return end
         if preset_id > 0 then Controls['Active Preset'][cluster_id].Value=preset_id
@@ -1810,7 +1868,9 @@ if Controls then
                 local regions=DB[cluster_id][DB_PRST+preset_id] or {}
                 local width, height=(DB[cluster_id][DB_W] or 2048), (DB[cluster_id][DB_H] or 576)
                 -- dbg(DG_FN, 'preset '..preset_id..' width '..width..' height '..height..' regions '..tbl_dump(regions))
-                draw_svg(Controls['Render Panel'], quick_draw_regions(width, height, regions, false, num_presets < 2))
+                local labels = create_labels(cluster_id, num_presets, regions)
+                local hide_name = num_presets < 2 or labels ~= nil
+                draw_svg(Controls['Render Panel'], quick_draw_regions(width, height, regions, false, hide_name, labels))
                 vis['CLUSTER30']=regions[DB_W] == 30
                 vis['CLUSTER28']=regions[DB_W] ~= 30
                 vis['CLUSTER']=true
