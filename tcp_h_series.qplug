@@ -303,7 +303,7 @@ if Controls then
             if preset_id == 0 then preset_id = Controls['Total Presets'][screen_id+1].Value - 1
             else preset_id = preset_id - 1 end
         end
-        if numberoutputs == 1 then 
+        if numberoutputs == 1 then -- Early return for single screen
             Controls['Current Preset'].Value = preset_id
             return screen_id, preset_id
         end
@@ -346,7 +346,7 @@ if Controls then
         local adjusted_id, preset_id = adjust_for_grouping(screen_id, strip_val('[Pp]reset=%d+', data, 7))
         if screen_id > -1 then
             if string.find(data, "[Pp]reset=") then -- Change preset
-                send_udp_data(cmd_load_preset(screen_id, preset_id))
+                send_udp_data(cmd_load_preset(adjusted_id, preset_id))
                 dbg(DG_FN, 'Load Preset '..preset_id)
             elseif string.find(data, "[Bb]rightness=") then
                 local level = strip_val('[Bb]rightness=%d+', data, 11)
