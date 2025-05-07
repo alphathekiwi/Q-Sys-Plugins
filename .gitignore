@@ -4,4 +4,4 @@
 # // Ignore testing files in commits
 *.tlua
 *.qplugt
-
+testing/*
