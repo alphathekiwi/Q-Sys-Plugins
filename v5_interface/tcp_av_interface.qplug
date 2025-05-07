@@ -1,0 +1,96 @@
+PluginInfo = {
+    Name = 'In Development~AV Layout V5',
+    Version = '1.0',
+    BuildVersion = '0.24.05.07',
+    Id = '8bdf6969-9368-0TCP-0AV0-0AV0LAYOUTS0',
+    Author = 'Total Concept Projects',
+    Description = 'AV Layout V5\nAaron | alphathekiwi@gmail.com'
+}
+-- Define the color of the plugin object in the design
+function GetColor(props) return {80, 80, 255} end
+-- The name that will initially display when dragged into a design
+function GetPrettyName(props) return 'AV Layout V5' end
+
+function GetComponents(props)
+    local components = {}
+    return components
+end
+function GetWiring(props)
+    local wiring = {}
+    return wiring
+end
+
+function GetPages(props)
+    local pages = {{name = "Main"}}
+    return pages
+end
+function GetProperties()
+    local props = {}
+    table.insert(props, {Name = 'Clusters', Type = 'integer', Min = 1, Max = 144, Value = 36})
+    return props
+end
+function GetControls(props)
+    local CLUSTERS = math.max(props['Awnings'].Value, 24)
+    local ctrls = {}
+    -- UCI CONTROLS
+    -- -[ NAVIGATION ]
+    table.insert(ctrls, {Name = 'FoxChn', ControlType = 'Button', ButtonType = 'Toggle', Count = 6}) -- [FOX CHANNEL]
+    table.insert(ctrls, {Name = 'Home', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'Label 1', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'Label 2', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'Base 1', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'Base 2', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'TCP Icon', ControlType = 'Button', ButtonType = 'Toggle', Count = 1}) -- > Settings
+    table.insert(ctrls, {Name = 'Foxtel', ControlType = 'Button', ButtonType = 'Toggle', Count = 6}) -- [FOXTEL]
+    -- -[ HOME ]
+    table.insert(ctrls, {Name = 'Cluster', ControlType = 'Button', ButtonType = 'Toggle', Count = 16})
+    -- -[ CLUSTER ]
+    table.insert(ctrls, {Name = 'Render Panel', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'ON', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'OFF', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'PRSTS', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    -- -[ CLUSTER28 | CLUSTER30 ]
+    table.insert(ctrls, {Name = 'ScreenTile', ControlType = 'Button', ButtonType = 'Toggle', Count = 360})
+    -- -[ PRESETS ]
+    table.insert(ctrls, {Name = 'Preset', ControlType = 'Button', ButtonType = 'Toggle', Count = 8})
+    -- -[ MACROS ]
+    table.insert(ctrls, {Name = 'Chn Macro', ControlType = 'Button', ButtonType = 'Toggle', Count = 32})
+    table.insert(ctrls, {Name = 'CH UP', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'CH DN', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'CTRLS', ControlType = 'Button', ButtonType = 'Toggle', Count = 1}) -- > Controls
+    -- -[ CONTROLS ]
+    for i = 0, 9 do table.insert(ctrls, {Name = 'Number ' .. i, ControlType = 'Button', ButtonType = 'Toggle', Count = 1}) end
+    table.insert(ctrls, {Name = 'HDMI 1', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'HDMI 2', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'DTV', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'VW SRC', ControlType = 'Button', ButtonType = 'Toggle', Count = 1}) -- > Videowall Source
+    table.insert(ctrls, {Name = 'ON', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'OFF', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'MCRS', ControlType = 'Button', ButtonType = 'Toggle', Count = 1}) -- > Macros
+    table.insert(ctrls, {Name = 'UP', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'DOWN', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'LEFT', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'RIGHT', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'OK', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'MENU', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'EXIT', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    -- -[ SETTINGS ]
+    table.insert(ctrls, {Name = 'STTNGS', ControlType = 'Button', ButtonType = 'Toggle', Count = 1})
+    table.insert(ctrls, {Name = 'Videowall Label', ControlType = 'Button', ButtonType = 'Toggle', Count = 6})
+    table.insert(ctrls, {Name = 'Videowall Brightness', ControlType = 'Knob', ControlUnit = 'Integer', Min = 0, Max = 100, Count = 6})
+    
+    return ctrls
+end
+
+-- Layout of controls and graphics for the plugin UI to display
+function GetControlLayout(props)
+    local page = props['page_index'].Value
+    local layout = {}
+    local graphics = {}
+    return layout, graphics
+end
+
+if Controls then
+
+    
+end

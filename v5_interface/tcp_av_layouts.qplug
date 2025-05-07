@@ -1,0 +1,51 @@
+PluginInfo = {
+    Name = 'In Development~AV Layout V5',
+    Version = '1.0',
+    BuildVersion = '0.24.05.07',
+    Id = '8bdf6969-9368-0TCP-0AV0-0AV0LAYOUTS0',
+    Author = 'Total Concept Projects',
+    Description = 'AV Layout V5\nAaron | alphathekiwi@gmail.com'
+}
+-- Define the color of the plugin object in the design
+function GetColor(props) return {80, 80, 255} end
+-- The name that will initially display when dragged into a design
+function GetPrettyName(props) return 'AV Layout V5' end
+
+function GetComponents(props)
+    local components = {}
+    return components
+end
+function GetWiring(props)
+    local wiring = {}
+    return wiring
+end
+
+function GetPages(props)
+    local pages = {{name = "Main"}}
+    return pages
+end
+function GetProperties()
+    local props = {}
+    table.insert(props, {Name = 'Clusters', Type = 'integer', Min = 1, Max = 144, Value = 36})
+    return props
+end
+function GetControls(props)
+    local CLUSTERS = math.max(props['Awnings'].Value, 24)
+    local ctrls = {}
+    table.insert(ctrls, {Name = 'Cluster', ControlType = 'Button', ButtonType = 'Toggle', Count = CLUSTERS})
+    
+    return ctrls
+end
+
+-- Layout of controls and graphics for the plugin UI to display
+function GetControlLayout(props)
+    local page = props['page_index'].Value
+    local layout = {}
+    local graphics = {}
+    return layout, graphics
+end
+
+if Controls then
+
+    
+end

@@ -1,0 +1,206 @@
+PluginInfo = {
+    Name = 'C-Bus~Awnings',
+    Version = '1.0',
+    BuildVersion = '0.24.05.07',
+    Id = '8bdf6969-9368-0TCP-0AV0-0CBUS0AWNING',
+    Author = 'Total Concept Projects',
+    Description = 'C-Bus Awnings\nAaron | alphathekiwi@gmail.com'
+}
+-- Define the color of the plugin object in the design
+function GetColor(props) return {80, 80, 255} end
+-- The name that will initially display when dragged into a design
+function GetPrettyName(props) return 'C-Bus Awnings' end
+
+function GetComponents(props)
+    local components = {}
+    return components
+end
+function GetWiring(props)
+    local wiring = {}
+    return wiring
+end
+
+function GetPages(props)
+    local pages = {{name = "Main"}}
+    return pages
+end
+function GetProperties()
+    local props = {}
+    table.insert(props, {Name = 'Awnings', Type = 'integer', Min = 1, Max = 16, Value = 6})
+    return props
+end
+function GetControls(props)
+    local ctrls = {}
+    table.insert(ctrls, {Name = 'C-BUS Network', ControlType = 'Text', Default = "Network 1", Count = 1})
+    local awnings = props['Awnings'].Value
+    table.insert(ctrls, {Name = 'Awning Name', ControlType = 'Text', Count = awnings, UserPin = true, PinStyle = 'Both'})
+    table.insert(ctrls, {Name = 'Awning Address', ControlType = 'Knob', ControlUnit = 'Integer', Min = -1, Default = -1, Max = 255, Count = awnings, UserPin = true, PinStyle = 'Both'})
+    table.insert(ctrls, {Name = 'Awning Open', ControlType = 'Button', ButtonType = 'Toggle', Count = awnings, UserPin = true, PinStyle = 'Both'})
+    table.insert(ctrls, {Name = 'Awning Stop', ControlType = 'Button', ButtonType = 'Toggle', Count = awnings, UserPin = true, PinStyle = 'Both'})
+    table.insert(ctrls, {Name = 'Awning Close', ControlType = 'Button', ButtonType = 'Toggle', Count = awnings, UserPin = true, PinStyle = 'Both'})
+    return ctrls
+end
+
+-- Layout of controls and graphics for the plugin UI to display
+function GetControlLayout(props)
+    local awnings = props['Awnings'].Value
+    local page = props['page_index'].Value
+    local layout = {}
+    local graphics = {}
+    if page == 1 then
+        table.insert(graphics, {Position = {5, 5}, Size = {590, 60 + 28 * awnings}, Type = 'GroupBox', Fill = {20, 20, 70, 50}, StrokeWidth = 0, CornerRadius = 0})
+
+        table.insert(graphics, {Position = {37, 9}, Size = {148, 24}, Type = 'Text', Text = 'C-BUS Network', FontSize = 16, HTextAlign = 'Center'})
+        layout['C-BUS Network'] = {Position = {189, 9}, Size = {148, 24}, FontSize = 14, Margin = 0, Padding = 2, StrokeWidth = 0}
+
+        table.insert(graphics, {Position = {37, 37}, Size = {148, 24}, Type = 'Text', Text = 'C-Bus Group', FontSize = 14, HTextAlign = 'Center'})
+        table.insert(graphics, {Position = {189, 37}, Size = {148, 24}, Type = 'Text', Text = 'Awning Name', FontSize = 14, HTextAlign = 'Center'})
+        table.insert(graphics, {Position = {346, 37}, Size = {148, 24}, Type = 'Text', Text = 'Awning Level', FontSize = 14, HTextAlign = 'Center'})
+        if awnings == 1 then
+            table.insert(graphics, {Position = {9, 65}, Size = {24, 24}, Type = 'Text', Text = '1', FontSize = 14, HTextAlign = 'Center'})
+            layout['Awning Address'] = {Position = {37, 65}, Size = {148, 24}, PrettyName = "Group", FontSize = 14, Margin = 0, Padding = 2, StrokeWidth = 0}
+            layout['Awning Name'] = {Position = {189, 65}, Size = {148, 24}, PrettyName = "Name", FontSize = 14, Margin = 0, Padding = 2, StrokeWidth = 0}
+            layout['Awning Open'] = {Position = {346, 65}, Size = {74, 24}, PrettyName = "Open", Color = {155, 255, 62}, FontSize = 14, Padding = 2, StrokeWidth = 0}
+            layout['Awning Stop'] = {Position = {424, 65}, Size = {74, 24}, PrettyName = "Stop", Color = {250, 209, 74}, FontSize = 14, Padding = 2, StrokeWidth = 0}
+            layout['Awning Close'] = {Position = {502, 65}, Size = {74, 24}, PrettyName = "Close", Color = {255, 71, 71}, FontSize = 14, Padding = 2, StrokeWidth = 0}
+        else
+            for i = 1, awnings do
+                table.insert(graphics, {Position = {9, 37 + i * 28}, Size = {24, 24}, Type = 'Text', Text = '' .. i, FontSize = 14, HTextAlign = 'Center'})
+                layout['Awning Address ' .. i] = {Position = {37, 37 + i * 28}, Size = {148, 24}, PrettyName = "Awning " .. i .. "~Group", FontSize = 14, Margin = 0, Padding = 2, StrokeWidth = 0}
+                layout['Awning Name ' .. i] = {Position = {189, 37 + i * 28}, Size = {148, 24}, PrettyName = "Awning " .. i .. "~Name", FontSize = 14, Margin = 0, Padding = 2, StrokeWidth = 0}
+                layout['Awning Open ' .. i] = {
+                    Position = {346, 37 + i * 28},
+                    Size = {74, 24},
+                    Color = {155, 255, 62},
+                    Legend = "Open",
+                    PrettyName = "Awning " .. i .. "~Open",
+                    FontSize = 14,
+                    Padding = 2,
+                    StrokeWidth = 0
+                }
+                layout['Awning Stop ' .. i] = {
+                    Position = {424, 37 + i * 28},
+                    Size = {74, 24},
+                    Color = {250, 209, 74},
+                    Legend = "Stop",
+                    PrettyName = "Awning " .. i .. "~Stop",
+                    FontSize = 14,
+                    Padding = 2,
+                    StrokeWidth = 0
+                }
+                layout['Awning Close ' .. i] = {
+                    Position = {502, 37 + i * 28},
+                    Size = {74, 24},
+                    Color = {255, 71, 71},
+                    Legend = "Close",
+                    PrettyName = "Awning " .. i .. "~Close",
+                    FontSize = 14,
+                    Padding = 2,
+                    StrokeWidth = 0
+                }
+            end
+        end
+    end
+    return layout, graphics
+end
+
+if Controls then
+    awnings = Properties["Awnings"].Value
+    network = "\\053800"
+    UNKNOWN, OPEN, STOP, CLOSE = 0, 1, 2, 3
+    STATE_NAMES = {[OPEN] = "Awning Open", [STOP] = "Awning Stop", [CLOSE] = "Awning Close"}
+    CMDS = {0,02,100}
+    CurrentLevel = {}
+
+    -- Discover C-BUS Networks
+    KNOWN_NETWORKS = {};
+    Notifications.Subscribe('C-BUS.Network.Name', function(_, networkName) KNOWN_NETWORKS[networkName] = os.time(); end);
+
+    -- Expire C-BUS Networks
+    NetworkExpiry = Timer.New();
+    NetworkExpiry.EventHandler = function()
+        for k, t in pairs(KNOWN_NETWORKS) do if (t + 2 < os.time()) then KNOWN_NETWORKS[k] = nil; end end
+        local display_networks = {};
+        for u, _ in pairs(KNOWN_NETWORKS) do table.insert(display_networks, u); end
+        Controls['C-BUS Network'].Choices = display_networks;
+    end;
+    NetworkExpiry:Start(1);
+
+    -- Parse Data
+    function parseData(awning, state)
+        if awnings == 1 then
+            grp = math.floor(Controls["Awning Address"].Value)
+            lvl = CMDS[state];
+        else
+            grp = math.floor(Controls["Awning Address"][awning].Value)
+            lvl = CMDS[state]
+        end
+        if lvl == -1 then return end
+        print(awning, "changed sending to", grp, lvl)
+        -- readout = string.format("[%02X][%02X][%02X][%02X][%02X][%02X]", 05, 56, 00, 0x02, grp, lvl)
+        -- data = string.format("%s%02X%02X%02Xz", network, 0x02, grp, lvl)
+        data = string.format("K:P:[00:38:%02X]:%d:0", grp, lvl)
+        Notifications.Publish('C-BUS.Network.' .. Controls['C-BUS Network'].String, {command = data, hex = readout, group = grp, level = lvl})
+        print(string.format("\nPublishing - Hex Data Readout: %s, String Command: %s", readout, data));
+    end
+
+    -- Realtime Fader Update
+    function levelChange(first_run)
+        CTimer:Start(0.15)
+    end
+
+    -- Publish Initialize Values
+    function initTimer()
+        if initBool then
+            update_current_levels()
+            initBool = false;
+            print("Level Sync'd");
+        end
+    end
+
+    -- Subscribe to Initialize Control State Request
+    initBool = false
+    function subInit()
+        if (getStates) then Notifications.Unsubscribe(getStates); end
+        getStates = Notifications.Subscribe('Request.Control.States.' .. Controls['C-BUS Network'].String, function(_, _)
+            initBool = true;
+            print(string.format("Sync Requested for Network: '%s'", Controls['C-BUS Network'].String))
+        end);
+        -- print(string.format("Initial control states requested by %s", Controls['C-BUS Network'].String))
+    end
+
+    function update_current_levels()
+        if awnings == 1 then
+            if not CurrentLevel[1] or CurrentLevel[1] == UNKNOWN then return end
+            if Controls[STATE_NAMES[CurrentLevel[1]]].Value == 1 then parseData(1, CurrentLevel[1]) end            
+            Controls[STATE_NAMES[CurrentLevel[1]]].Value = 0
+        else
+            for l = 1, awnings do
+                if CurrentLevel[l] and CurrentLevel[l] ~= UNKNOWN then
+                    if Controls[STATE_NAMES[CurrentLevel[l]]][l].Value == 1 then parseData(l, CurrentLevel[l]) end                  
+                    Controls[STATE_NAMES[CurrentLevel[l]]][l].Value = 0
+                end
+            end
+        end
+    end
+    -- Check for control change
+    CTimer = Timer.New()
+    CTimer.EventHandler = function(t)
+        t:Stop()
+        update_current_levels()
+    end
+
+    -- initTimer
+    ITimer = Timer.New()
+    ITimer.EventHandler = initTimer
+    ITimer:Start(.2)
+
+    subInit()
+    if awnings == 1 then
+        for state, name in pairs(STATE_NAMES) do Controls[name].EventHandler = function(c) CurrentLevel[1] = state end end
+    else
+        for l = 1, awnings do
+            for state, name in pairs(STATE_NAMES) do Controls[name].EventHandler = function(c) CurrentLevel[l] = state end end
+        end
+    end
+end

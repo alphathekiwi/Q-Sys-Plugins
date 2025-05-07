@@ -1,0 +1,219 @@
+PluginInfo = {
+    Name = 'C-Bus~RGB',
+    Version = '1.0',
+    BuildVersion = '0.24.05.07',
+    Id = '8bdf6969-9368-0TCP-0AV0-0CBUS0RGB000',
+    Author = 'Total Concept Projects',
+    Description = 'C-Bus RGB\nAaron | alphathekiwi@gmail.com'
+}
+-- Define the color of the plugin object in the design
+function GetColor(props) return {80, 255, 80} end
+-- The name that will initially display when dragged into a design
+function GetPrettyName(props) return 'C-Bus RGB' end
+
+function GetComponents(props)
+    local components = {}
+    return components
+end
+function GetWiring(props)
+    local wiring = {}
+    return wiring
+end
+
+function GetPages(props)
+    local pages = {{name = "Main"}}
+    return pages
+end
+function GetProperties()
+    local props = {}
+    table.insert(props, {Name = 'Lights', Type = 'integer', Min = 1, Max = 16, Value = 2})
+    return props
+end
+function GetControls(props)
+    local ctrls = {}
+    table.insert(ctrls, {Name = 'C-BUS Network', ControlType = 'Text', Default = "Network 1", Count = 1})
+    local lights = props['Lights'].Value
+    table.insert(ctrls, {Name = 'Light Name', ControlType = 'Text', Count = lights, UserPin = true, PinStyle = 'Both'})
+    table.insert(ctrls, {Name = 'Light Address', ControlType = 'Knob', ControlUnit = 'Integer', Min = -1, Default = -1, Max = 255, Count = lights * 3, UserPin = true, PinStyle = 'Both'})
+    table.insert(ctrls, {Name = 'Light Level', ControlType = 'Knob', ControlUnit = 'Percent', Min = 0, Default = 0, Max = 100, Count = lights, UserPin = true, PinStyle = 'Output'})
+    table.insert(ctrls, {Name = 'Light Red', ControlType = 'Knob', ControlUnit = 'Percent', Min = 0, Default = 0, Max = 100, Count = lights, UserPin = true, PinStyle = 'Both'})
+    table.insert(ctrls, {Name = 'Light Green', ControlType = 'Knob', ControlUnit = 'Percent', Min = 0, Default = 0, Max = 100, Count = lights, UserPin = true, PinStyle = 'Both'})
+    table.insert(ctrls, {Name = 'Light Blue', ControlType = 'Knob', ControlUnit = 'Percent', Min = 0, Default = 0, Max = 100, Count = lights, UserPin = true, PinStyle = 'Both'})
+    return ctrls
+end
+
+-- Layout of controls and graphics for the plugin UI to display
+function GetControlLayout(props)
+    local lights = props['Lights'].Value
+    local page = props['page_index'].Value
+    local layout = {}
+    local graphics = {}
+    if page == 1 then
+        table.insert(graphics, {Position = {5, 5}, Size = {468, 60 + 84 * lights}, Type = 'GroupBox', Fill = {20, 20, 70, 50}, StrokeWidth = 0, CornerRadius = 0})
+
+        table.insert(graphics, {Position = {37, 9}, Size = {148, 24}, Type = 'Text', Text = 'C-BUS Network', FontSize = 16, HTextAlign = 'Center'})
+        layout['C-BUS Network'] = {Position = {189, 9}, Size = {148, 24}, FontSize = 14, Margin = 0, Padding = 2, StrokeWidth = 0}
+
+        table.insert(graphics, {Position = {37, 37}, Size = {148, 24}, Type = 'Text', Text = 'Light Name', FontSize = 14, HTextAlign = 'Center'})
+        table.insert(graphics, {Position = {189, 37}, Size = {148, 24}, Type = 'Text', Text = 'C-Bus Group', FontSize = 14, HTextAlign = 'Center'})
+        table.insert(graphics, {Position = {346, 37}, Size = {104, 24}, Type = 'Text', Text = 'Light Level', FontSize = 14, HTextAlign = 'Center'})
+
+        if lights == 1 then
+            table.insert(graphics, {Position = {9, 65}, Size = {24, 24}, Type = 'Text', Text = '1', FontSize = 14, HTextAlign = 'Center'})
+            layout['Light Name'] = {Position = {189, 65}, Size = {148, 24}, PrettyName = "Light Name", FontSize = 14, Margin = 0, Padding = 2, StrokeWidth = 0}
+            layout['Light Address ' .. (i * 3 - 2)] = {Position = {189, 84 - 19}, Size = {148, 24}, PrettyName = "Light Group", FontSize = 14, Padding = 2, StrokeWidth = 0}
+            layout['Light Address ' .. (i * 3 - 1)] = {Position = {189, 84 + 9}, Size = {148, 24}, PrettyName = "Light Group", FontSize = 14, Padding = 2, StrokeWidth = 0}
+            layout['Light Address ' .. (i * 3)] = {Position = {189, 84 + 37}, Size = {148, 24}, PrettyName = "Light Group", FontSize = 14, Padding = 2, StrokeWidth = 0}
+            layout['Light Red'] = {Position = {346, 84 - 19}, Size = {80, 24}, PrettyName = "Light Red", Color = {255, 0, 0}, FontSize = 14, Padding = 2, StrokeWidth = 0}
+            layout['Light Green'] = {Position = {346, 84 + 9}, Size = {80, 24}, PrettyName = "Light Green", Color = {0, 255, 0}, FontSize = 14, Padding = 2, StrokeWidth = 0}
+            layout['Light Blue'] = {Position = {346, 84 + 37}, Size = {80, 24}, PrettyName = "Light Blue", Color = {0, 0, 255}, FontSize = 14, Padding = 2, StrokeWidth = 0}
+            layout['Light Level'] = {Position = {430, 84 - 19}, Size = {24, 80}, PrettyName = "Light Level", Style = 'Meter', Color = {137, 114, 0}, FontSize = 0, Padding = 2, StrokeWidth = 0}
+        else
+            for i = 1, lights do
+                table.insert(graphics, {Position = {9, i * 84 - 19}, Size = {24, 24}, Type = 'Text', Text = '' .. i, FontSize = 14, HTextAlign = 'Center'})
+                layout['Light Name ' .. i] = {Position = {37, i * 84 - 19}, Size = {148, 24}, PrettyName = "Light " .. i .. "~Name", FontSize = 14, Padding = 2, StrokeWidth = 0}
+                layout['Light Address ' .. (i * 3 - 2)] = {Position = {189, i * 84 - 19}, Size = {148, 24}, PrettyName = "Light " .. i .. "~Group", FontSize = 14, Padding = 2, StrokeWidth = 0}
+                layout['Light Address ' .. (i * 3 - 1)] = {Position = {189, i * 84 + 9}, Size = {148, 24}, PrettyName = "Light " .. i .. "~Group", FontSize = 14, Padding = 2, StrokeWidth = 0}
+                layout['Light Address ' .. (i * 3)] = {Position = {189, i * 84 + 37}, Size = {148, 24}, PrettyName = "Light " .. i .. "~Group", FontSize = 14, Padding = 2, StrokeWidth = 0}
+                layout['Light Red ' .. i] = {Position = {346, i * 84 - 19}, Size = {80, 24}, PrettyName = "Light " .. i .. "~Red", Color = {255, 0, 0}, FontSize = 14, Padding = 2, StrokeWidth = 0}
+                layout['Light Green ' .. i] = {Position = {346, i * 84 + 9}, Size = {80, 24}, PrettyName = "Light " .. i .. "~Green", Color = {0, 255, 0}, FontSize = 14, Padding = 2, StrokeWidth = 0}
+                layout['Light Blue ' .. i] = {Position = {346, i * 84 + 37}, Size = {80, 24}, PrettyName = "Light " .. i .. "~Blue", Color = {0, 0, 255}, FontSize = 14, Padding = 2, StrokeWidth = 0}
+                layout['Light Level ' .. i] = {Position = {430, i * 84 - 19}, Size = {24, 80}, PrettyName = "Light " .. i .. "~Level", Style = 'Meter', FontSize = 0, Padding = 2, StrokeWidth = 0}
+            end
+        end
+    end
+    return layout, graphics
+end
+
+if Controls then
+    R, G, B = 1, 2, 3
+    lights = Properties["Lights"].Value
+    network = "\\053800"
+
+    CurrentLevel = {}
+    for l = 1, lights do CurrentLevel[l] = {[R] = 0, [G] = 0, [B] = 0} end
+
+    -- Discover C-BUS Networks
+    KNOWN_NETWORKS = {};
+    Notifications.Subscribe('C-BUS.Network.Name', function(_, networkName) KNOWN_NETWORKS[networkName] = os.time(); end);
+
+    -- Expire C-BUS Networks
+    NetworkExpiry = Timer.New();
+    NetworkExpiry.EventHandler = function()
+        for k, t in pairs(KNOWN_NETWORKS) do if (t + 2 < os.time()) then KNOWN_NETWORKS[k] = nil; end end
+        local display_networks = {};
+        for u, _ in pairs(KNOWN_NETWORKS) do table.insert(display_networks, u); end
+        Controls['C-BUS Network'].Choices = display_networks;
+    end;
+    NetworkExpiry:Start(1);
+
+    function send_channels(grp, lvl)
+        readout = string.format("[%02X][%02X][%02X][%02X][%02X][%02X]", 05, 56, 00, 0x02, grp, lvl)
+        data = string.format("%s%02X%02X%02Xz", network, 0x02, grp, lvl)
+        Notifications.Publish('C-BUS.Network.' .. Controls['C-BUS Network'].String, {command = data, hex = readout, group = grp, level = lvl})
+    end
+    -- Parse Data
+    function parseData(light)
+        if lights == 1 then
+            r_g = math.floor(Controls["Light Address"][1].Value)
+            g_g = math.floor(Controls["Light Address"][2].Value)
+            b_g = math.floor(Controls["Light Address"][3].Value)
+            red = math.ceil(Controls["Light Red"].Value * 2.55)
+            green = math.ceil(Controls["Light Green"].Value * 2.55)
+            blue = math.ceil(Controls["Light Blue"].Value * 2.55)
+            Controls['Light Level'].Color = string.format("#%02X%02X%02X", red, green, blue)
+            Controls['Light Level'].Value = math.max(red, green, blue) / 2.55
+        else
+            r_g = math.floor(Controls["Light Address"][light * 3 - 2].Value)
+            g_g = math.floor(Controls["Light Address"][light * 3 - 1].Value)
+            b_g = math.floor(Controls["Light Address"][light * 3].Value)
+            red = math.ceil(Controls["Light Red"][light].Value * 2.55)
+            green = math.ceil(Controls["Light Green"][light].Value * 2.55)
+            blue = math.ceil(Controls["Light Blue"][light].Value * 2.55)
+            Controls['Light Level'][light].Color = string.format("#%02X%02X%02X", red, green, blue)
+            Controls['Light Level'][light].Value = math.max(red, green, blue) / 2.55
+        end
+        if lvl == -1 then return end
+        print(light, "changed sending to", red, green, blue)
+        send_channels(r_g, red)
+        send_channels(g_g, green)
+        send_channels(b_g, blue)
+        print(string.format("\nPublishing - Hex Data Readout: %s, String Command: %s", readout, data));
+    end
+
+    -- Realtime Fader Update
+    function levelChange(first_run)
+        if lights == 1 then
+            CurrentLevel[1][R] = Controls['Light Red'].Value
+            CurrentLevel[1][G] = Controls['Light Green'].Value
+            CurrentLevel[1][B] = Controls['Light Blue'].Value
+        else
+            for l = 1, lights do
+                CurrentLevel[l][R] = Controls['Light Red'][l].Value
+                CurrentLevel[l][G] = Controls['Light Green'][l].Value
+                CurrentLevel[l][B] = Controls['Light Blue'][l].Value
+            end
+        end
+        CTimer:Start(0.15)
+    end
+
+    -- Publish Initialize Values
+    function initTimer()
+        if initBool then
+            update_current_levels()
+            initBool = false;
+            print("Level Sync'd");
+        end
+    end
+
+    -- Subscribe to Initialize Control State Request
+    initBool = false
+    function subInit()
+        if (getStates) then Notifications.Unsubscribe(getStates); end
+        getStates = Notifications.Subscribe('Request.Control.States.' .. Controls['C-BUS Network'].String, function(_, _)
+            initBool = true;
+            print(string.format("Sync Requested for Network: '%s'", Controls['C-BUS Network'].String))
+        end);
+        -- print(string.format("Initial control states requested by %s", Controls['C-BUS Network'].String))
+    end
+
+    function update_current_levels()
+        if lights == 1 then
+            if Controls['Light Red'].Value ~= CurrentLevel[1][R] or Controls['Light Green'].Value ~= CurrentLevel[1][G] or Controls['Light Blue'].Value ~= CurrentLevel[1][B] then
+                parseData(1)
+            end
+        else
+            for l = 1, lights do
+                if Controls['Light Red'][l].Value ~= CurrentLevel[l][R] or Controls['Light Green'][l].Value ~= CurrentLevel[l][G] or Controls['Light Blue'][l].Value ~= CurrentLevel[l][B] then
+                    parseData(l)
+                end
+            end
+        end
+    end
+    -- Check for control change
+    CTimer = Timer.New()
+    CTimer.EventHandler = function(t)
+        t:Stop()
+        update_current_levels()
+    end
+
+    -- Periodic update
+    UTimer = Timer.New();
+    UTimer.EventHandler = levelChange;
+    UTimer:Start(.2);
+
+    -- initTimer
+    ITimer = Timer.New()
+    ITimer.EventHandler = initTimer
+    ITimer:Start(.2)
+
+    Controls['C-BUS Network'].EventHandler = levelChange;
+    update_current_levels()
+    subInit()
+    -- if lights > 1 then
+    --     for l = 1, lights do
+    --         Controls["Light Level"][l].IsInvisible = Controls["Light Address"][l].Value == -1
+    --         Controls["Light Address"][l].EventHandler = function(c) Controls["Light Level"][l].IsInvisible = c.Value == -1 end
+    --     end
+    -- end
+end

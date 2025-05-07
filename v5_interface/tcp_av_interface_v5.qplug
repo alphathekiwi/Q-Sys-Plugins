@@ -84,7 +84,7 @@ DEFAULT_CLS={[1]='seven_hd', [2]='seven_two', [3]='seven_mate', [5]='nine_hd', [
             [25]='foxbox1', [26]='foxbox2', [27]='foxbox3', [28]='foxbox4', [29]='foxbox5', [30]='foxbox6', [31]='apple', [32]='chrome'}
 FOXTEL_CLS={'foxtel501', 'foxtel502', 'foxtel503', 'foxtel504', 'foxtel505', 'foxtel506', 'foxtel507', 'foxtel508', 'foxtel509', 'foxtel510', 'foxtel521'}
 FOXTELS_MAPS={'501', '502', '503', '504','505', '506', '507', '508','509', '510', '521'}
-QCK_PRESETS={' ', 'Fullscreen', 'Twin Split', 'Triple Split', 'Five Way', 'Quad Split', 'LR Bars', 'Left 5 Split', 'Right 5 Split', 'Left 3 Split', 'Right 3 Split', 'Halves 6 Split', 'Thirds 9 Split', '5 Screens', '6 Screens', '7 Screens', '8 Screens'}
+QCK_PRESETS={' ', 'Fullscreen', 'Twin Split', 'Triple Split', 'Five Way', 'Quad Split', 'LR Bars', 'Left 5 Split', 'Right 5 Split', 'Left 3 Split', 'Right 3 Split', 'Halves 6 Split', 'Thirds 9 Split', '4 along side', '5 Screens', '6 Screens', '7 Screens', '8 Screens'}
 QCK_REGIONS = {
     [' ']={},
     ['Fullscreen']={ {0, 0, 1, 1}},
@@ -137,6 +137,11 @@ QCK_REGIONS = {
         {0.666666667, 0.666666667, 0.166666667, 0.333333334},
         {0.833333334, 0.666666667, 0.166666667, 0.333333334}},
     -- SCREENS NOT PRESETS
+    ['4 along side'] = {
+        {0, 0, 0.25, 1},
+        {0.25, 0, 0.5, 1},
+        {0.5, 0, 0.5, 1},
+        {0.75, 0, 0.5, 1}},
     ['5 Screens']={ -- 6 * 5
         {0, 0, 0.5, 0.6},
         {0.5, 0, 0.5, 0.6},
@@ -170,7 +175,7 @@ RENDER_ID={['28 Divisions (7,4,2)']=28, ['30 Divisions (6,5,3,2)']=30, ['28 Divi
 CTRL_MAP={[1]='CH UP', [2]='CH DN', [3]='MENU', [4]='EXIT', [5]='OK', [6]='UP', [7]='DOWN', [8]='RIGHT', [9]='LEFT', [10]='ON', [11]='OFF', [12]='HDMI 1', [13]='HDMI 2', [14]='DTV'}
 CTRL_ID={['CH UP']=1, ['CH DN']=2, ['MENU']=3, ['EXIT']=4, ['OK']=5, ['UP']=6, ['DOWN']=7, ['RIGHT']=8, ['LEFT']=9, ['ON']=10, ['OFF']=11, ['HDMI 1']=12, ['HDMI 2']=13, ['DTV']=14}
 SCREEN_LAYOUTS={'Fullscreen', 'Twin Split', 'Triple Split', 'Quad Split', '5 Screens', '6 Screens', '7 Screens', '8 Screens'}
-SCREEN_SIZES  ={{2048, 1152, 28}, {2048, 576, 28},  {3072, 576, 30}, {2048, 1152, 28},   {3072, 1440, 28}, {1536, 576, 28}, {3072, 1008, 30}, {2048, 576, 28}}
+SCREEN_SIZES  ={{2048, 1152, 28}, {2048, 576, 28}, {3072, 576, 30}, {2048, 1152, 28}, {3072, 1440, 28}, {1536, 576, 28}, {3072, 1008, 30}, {2048, 576, 28}}
 SCREEN_SIZES[0]={1920, 1080, 28}
 CLR_REGIONS={
     {255, 194, 194}, {255, 225, 194}, {255, 255, 194}, {225, 255, 194},
