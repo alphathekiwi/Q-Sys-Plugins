@@ -1028,16 +1028,16 @@ if Controls then
             width = 3072
             height = 1152
         end
-        local font_size = math.floor(math.max(height / 18, width / 48))
+        local scale = math.floor(math.max(height / 18, width / 48))
         doc = EzSVG.Document(width, height, 'dimgray')
-        local text_data = {font_size = font_size, font_family = "Arial", text_anchor = "middle", dominant_baseline = "middle", fill = "#222222", stroke = "black"}
+        local text_data = {font_size = scale, stroke_width = math.floor(scale / 10), font_family = "Arial", text_anchor = "middle", dominant_baseline = "middle", fill = "#222222", stroke = "black"}
         for i, r in pairs(regions or {}) do
             if i > DB_RGN then
                 if preview then
                     local clr = string.format('#%02x%02x%02x', CLR_REGIONS[i - DB_RGN][1], CLR_REGIONS[i - DB_RGN][2], CLR_REGIONS[i - DB_RGN][3])
-                    EzSVG.setStyle({stroke_width = 8, stroke = 'dimgray', fill = clr})
+                    EzSVG.setStyle({stroke_width = math.floor(scale / 3.5), stroke = 'dimgray', fill = clr})
                 else
-                    EzSVG.setStyle({stroke_width = 8, stroke = 'dimgray', fill = '#ffffff'})
+                    EzSVG.setStyle({stroke_width = math.floor(scale / 3.5), stroke = 'dimgray', fill = '#ffffff'})
                 end
                 local x, y, w, h = r[1], r[2], r[3], r[4]
                 if type(x) == 'number' and type(y) == 'number' and type(w) == 'number' and type(h) == 'number' then
