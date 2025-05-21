@@ -17,6 +17,7 @@ function GetControls(props)
     table.insert(ctrls, {Name='Device ID', ControlType='Knob', ControlUnit='Integer', Min=0, Default=0, Max=255, Count=1 })
     table.insert(ctrls, {Name='Device IP', ControlType='Text', Count=1 })
     table.insert(ctrls, {Name='Device Port', ControlType='Text', Count=1 })
+    table.insert(ctrls, {Name='Device Name', ControlType='Text', Count=3 })
     table.insert(ctrls, {Name='Current Channel', ControlType='Knob', ControlUnit='Integer', Min=0, Default=0, Max=9999, Count=3 })
     
     table.insert(ctrls, {Name='ON', ControlType='Button', ButtonType='Toggle', Count=1 })
@@ -37,7 +38,7 @@ function GetControlLayout(props)
     local CurrentPage=PageNames[props['page_index'].Value]
     local ircmds=props['Number of IR Cmds'].Value
     if CurrentPage == 'Main' then
-        table.insert(graphics, {Type='GroupBox', Fill={20, 20, 70, 50}, StrokeWidth=0, CornerRadius=0, Position={5, 5}, Size={616, 148}})
+        table.insert(graphics, {Position={5, 5}, Size={616, 176}, Type='GroupBox', Fill={20, 20, 70, 50}, StrokeWidth=0, CornerRadius=0})
 
         table.insert(graphics, {Position={9, 9}, Size={148, 24}, Type='Text', Text='Device IP', FontSize=14, HTextAlign='Center'})
         table.insert(graphics, {Position={161, 9}, Size={68, 24}, Type='Text', Text='Port', FontSize=14, HTextAlign='Center'})
@@ -56,8 +57,10 @@ function GetControlLayout(props)
             table.insert(graphics, {Position={9 + i*152, 65}, Size={148, 24}, Type='Text', Text='IR Head CMD '..i, FontSize=14, HTextAlign='Center'})
             layout['Irhead CMD ' .. i]={Position={9 + i*152, 93}, Size={148, 24}, FontSize=10, Margin=0, Padding=2, StrokeWidth=0, PrettyName='IRhead '..i}
             layout['Current Channel '..i]={Position={9 + i*152, 121}, Size={148, 24}, FontSize=14, Margin=0, Padding=2, StrokeWidth=0}
+            layout['Device Name '..i]={Position={9 + i*152, 149}, Size={148, 24}, FontSize=14, Margin=0, Padding=2, StrokeWidth=0}
         end
         table.insert(graphics, {Position={9, 121}, Size={148, 24}, Type='Text', Text='Current Channel', FontSize=14, HTextAlign='Right'})
+        table.insert(graphics, {Position={9, 149}, Size={148, 24}, Type='Text', Text='Device Names', FontSize=14, HTextAlign='Right'})
     else
         table.insert(graphics, {Type='GroupBox', Fill={20, 20, 70, 50}, StrokeWidth=0, CornerRadius=0, Position={5, 5}, Size={616, 4 + (28 * ircmds)}})
         for i=1, ircmds do
@@ -297,6 +300,13 @@ if Controls then
             local chn = tonumber(strip_val('[Mm]acro=%d+', data, 6))
             Controls['Current Channel'][irhead].Value = chn
             send_channel(irhead, chn)
+        elseif string.find(data, '[Nn]ame') then
+            local name = strip_val('[Nn]ame=[^,]+', data, 5)
+            local ip = strip_val('[Ii]p=[^,]+', data, 3)
+            if name  ~= 0 then Controls["Device Name"][irhead].String = name end
+            if ip ~= 0 then Controls["Device IP"].String = ip end
+        elseif string.find(data, '[Ii]dle') then
+            queue_add(screen.queue, data)
         end
     end
     function send_channel(irhead, channel)

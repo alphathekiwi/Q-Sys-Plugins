@@ -171,15 +171,19 @@ if Controls then
 
     function update_current_levels()
         if awnings == 1 then
-            if not CurrentLevel[1] or CurrentLevel[1] == UNKNOWN then return end
-            if Controls[STATE_NAMES[CurrentLevel[1]]].Value == 1 then parseData(1, CurrentLevel[1]) end            
-            Controls[STATE_NAMES[CurrentLevel[1]]].Value = 0
+            for state, name in pairs(STATE_NAMES) do 
+                if Controls[name].Value == 1 then 
+                    for otr, other in pairs(STATE_NAMES) do Controls[other].Value = state == otr end
+                    CurrentLevel[1] = state
+            end end
         else
             for l = 1, awnings do
-                if CurrentLevel[l] and CurrentLevel[l] ~= UNKNOWN then
-                    if Controls[STATE_NAMES[CurrentLevel[l]]][l].Value == 1 then parseData(l, CurrentLevel[l]) end                  
-                    Controls[STATE_NAMES[CurrentLevel[l]]][l].Value = 0
-                end
+                for state, name in pairs(STATE_NAMES) do 
+                    if Controls[name][l].Value == 1 then
+                        print(l, "found", name, "as active")
+                        for otr, other in pairs(STATE_NAMES) do Controls[other][l].Value = state == otr end
+                        CurrentLevel[l] = state
+                end end
             end
         end
     end
@@ -197,10 +201,18 @@ if Controls then
 
     subInit()
     if awnings == 1 then
-        for state, name in pairs(STATE_NAMES) do Controls[name].EventHandler = function(c) CurrentLevel[1] = state end end
+        for state, name in pairs(STATE_NAMES) do Controls[name].EventHandler = function(c)
+            if c.Value == 0 then return end
+            for otr, other in pairs(STATE_NAMES) do Controls[other].Value = state == otr end
+            CurrentLevel[1] = state
+        end end
     else
         for l = 1, awnings do
-            for state, name in pairs(STATE_NAMES) do Controls[name].EventHandler = function(c) CurrentLevel[l] = state end end
+            for state, name in pairs(STATE_NAMES) do Controls[name][l].EventHandler = function(c)
+                if c.Value == 0 then return end
+                for otr, other in pairs(STATE_NAMES) do Controls[other][l].Value = state == otr end
+                CurrentLevel[l] = state
+            end end
         end
     end
 end

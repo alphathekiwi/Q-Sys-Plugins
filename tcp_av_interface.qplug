@@ -2438,6 +2438,10 @@ if Controls then
                     if string.find(ctrl.String, '[Vv]wo=') then vwo = tonumber(strip_val('[Vv]wo=[^,]+', ctrl.String, 4)) end
                     if string.find(ctrl.String, '[Ll]yro=') then lyro = tonumber(strip_val('[Ll]yro=[^,]+', ctrl.String, 5)) end
                     override_region(region, nil, vwo, lyro)
+                elseif string.find(ctrl.String, 'Start of Day') then
+                    cluster_on_off(true, cluster)
+                elseif string.find(ctrl.String, 'End of Day') then
+                    cluster_on_off(false, cluster)
                 else
                     local panel = cluster_to_panel_id(cluster)
                     queue_add(QUEUE[QUE_CLUSTER], 'panel=' .. panel .. ctrl.String)
